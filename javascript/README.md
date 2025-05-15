@@ -22,6 +22,28 @@ Blocks access to distracting/time-wasting websites (like social media or news) u
 **Reset the timer:**  
 If you want to reset Gandalf’s block timer, open the site with `?reset` at the end of the URL (e.g. `https://dtf.ru/?reset`).
 
+## How it works
+
+**When a blocked site is opened:**
+
+- The browser tab and favicon change:
+
+![Tab appearance during block](screenshots/gandalf-tab.png)
+
+**Then, you must pass through these 3 steps:**
+
+1. **Plea step:**
+
+   ![Step 1: Plea to Gandalf](screenshots/gandalf-step-1.png)
+
+2. **Pick time step:**
+
+   ![Step 2: Choose access time](screenshots/gandalf-step-2.png)
+
+3. **Phrase challenge:**
+
+   ![Step 3: Type exact phrase](screenshots/gandalf-step-3.png)
+
 ---
 
 Other scripts may be added here in the future.
