@@ -1,0 +1,43 @@
+# Node modules and common dependency dirs
+node_modules/
+bower_components/
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor and IDE settings
+.vscode/
+.idea/
+*.swp
+
+# Logs and temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+temp.*
+
+# OS junk
+*.bak
+*.orig
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Mac ._ files
+._*
+
+# Env/config
+.env
+.env.local
+
+# If you want to ignore all *.local files:
+*.local
+
+# Ignore build/dist if you ever use bundlers
+dist/
+build/
