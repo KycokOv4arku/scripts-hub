@@ -41,3 +41,6 @@ __pycache__/
 # Ignore build/dist if you ever use bundlers
 dist/
 build/
+
+
+*.bat
