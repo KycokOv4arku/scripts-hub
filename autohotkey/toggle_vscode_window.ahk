@@ -1,99 +1,77 @@
 ﻿#Requires AutoHotkey v2.0
 
-; -----------------------------------------------------------------------------
-; VSCode Toggle & Notifications (AutoHotkey v2.0)
-; • Hotkey: Win+C
-;   – If VS Code is active: hides window, resets transparency to 240, “Code hidden to tray”
-;   – If VS Code is hidden: shows/activates window, resets transparency to 240,
-;     “Code is now active”
-;   – If VS Code isn’t running: launches executable, waits for activation,
-;     resets transparency to 240, “Code is launching”
-; • Globals:
-;   – vscode_hwnd: stores VS Code window handle for hide/show logic
-; • Function:
-;   – ShowDualNotifications(leftMessage, rightMessage, duration := 2000)
-;       • Builds two always-on-top GUIs (one per monitor) with custom font/background
-;       • Displays messages at specified positions for given duration
-; -----------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+; VSCode Toggle – Win + C
+; • 1st press → hide every visible “Code.exe” window, store handles, alpha 240
+; • 2nd press → restore all stored windows, activate the last, clear the list
+; • Nothing running/hidden → launch the exe, then set alpha 240
+; • Toast on both monitors for each action (“hidden”, “restored”, “launching”)
+; Globals
+;   – hiddenVS : Array of hidden HWNDs
+;   – VsPath   : Full path to Code.exe (edit to suit)
+; Requires AutoHotkey v2.0 (no v2.1-only features).
+;------------------------------------------------------------------------------
 
-global vscode_hwnd := 0  ; Store VS Code window handle
+global hiddenVS := []                          ; remembers hidden Code windows
 
-#c:: {
-    global vscode_hwnd  ; Ensure global variable is accessible inside function
-
-    if WinActive("ahk_exe Code.exe") {
-        vscode_hwnd := WinGetID("ahk_exe Code.exe")  ; Store window handle
-        WinHide(vscode_hwnd)  ; Hide VS Code
-
-        ; show notification
-        ShowDualNotifications(
-            "Code hidden to tray",
-            "Code hidden to tray",
-            2000
-        )
-
-        WinSetTransparent 240, vscode_hwnd ; ensure transparency being back to default.
-
-    } else if vscode_hwnd && WinExist(vscode_hwnd) {
-        WinShow(vscode_hwnd)  ; Restore hidden window
-        WinActivate(vscode_hwnd)
-        WinSetTransparent 240, vscode_hwnd ; ensure transparency being back to default.
-
-        ; show notification
-        ShowDualNotifications(
-            "Code is now active",
-            "Code is now active",
-            2000
-        )
-    } else {
-        Run "C:\Users\kycok\AppData\Local\Programs\Microsoft VS Code\Code.exe"
-        ; show notification
-        ShowDualNotifications(
-            "Code is launching",
-            "Code is launching",
-            3000
-        )
-        WinWaitActive("ahk_exe Code.exe", , 5)
-        Sleep 500
-        vscode_hwnd := WinGetID("ahk_exe Code.exe")  ; Store new instance
-        WinSetTransparent 240, vscode_hwnd ; ensure transparency being back to default.
-
+;───────────────────────────────────────────────────────────────────────────────
+ShowDualNotifications(leftMsg, rightMsg, duration := 2000) {
+    LeftGui := Gui(, "Left"), RightGui := Gui(, "Right")
+    for _, g in [LeftGui, RightGui] {
+        g.Opt("+AlwaysOnTop -Caption +ToolWindow")
+        g.SetFont("s18 w600", "Segoe UI")
+        g.BackColor := "161616"
+        g.Add("Text", "cdedede w240", (g = LeftGui) ? leftMsg : rightMsg)
     }
-}
-
-; claude helped to do notifications for both monitors.
-ShowDualNotifications(leftMessage, rightMessage, duration := 2000) {
-    ; Create GUIs for both monitors
-    LeftGui := Gui(, "Left Monitor")
-    RightGui := Gui(, "Right Monitor")
-
-    ; Style Left GUI
-    LeftGui.Opt("+AlwaysOnTop -Caption +ToolWindow")
-    LeftGui.SetFont("s18 w600", "Segoe UI")
-    LeftGui.BackColor := "161616"
-
-    ; Style Right GUI
-    RightGui.Opt("+AlwaysOnTop -Caption +ToolWindow")
-    RightGui.SetFont("s18 w600", "Segoe UI")
-    RightGui.BackColor := "161616"
-
-    ; Add text with custom styling
-    textOpts := "cdedede w240" ; play with w400 as width of a notification box. based on longest msg.
-    LeftGui.Add("Text", textOpts, leftMessage)
-    RightGui.Add("Text", textOpts, rightMessage)
-
-    ; Calculate center positions
-    leftX := -700   ; Center of left monitor
-    leftY := 522    ; Center of left monitor height
-    rightX := 960   ; Center of right monitor
-    rightY := 540   ; Center of right monitor height
-
-    ; Show both GUIs
-    LeftGui.Show(Format("x{} y{} NoActivate", leftX, leftY))
-    ; w := LeftGui.Pos.W, h := LeftGui.Pos.H
-    ; LeftGui.Show(Format("x{} y{} NoActivate", leftX - w / 2, leftY - h / 2))
-    RightGui.Show("xCenter yCenter NoActivate")
-
-    ; Set up destruction timers
+    LeftGui.Show("x-700 y522 NoActivate"), RightGui.Show("xCenter yCenter NoActivate")
     SetTimer () => (LeftGui.Destroy(), RightGui.Destroy()), -duration
+}
+;───────────────────────────────────────────────────────────────────────────────
+
+#c:: {                                         ; toggle all VS-Code windows
+    global hiddenVS
+    path := "C:\Users\kycok\AppData\Local\Programs\Microsoft VS Code\Code.exe"
+
+    ; 1) Are there any VISIBLE VS-Code windows right now?
+    DetectHiddenWindows(false)                 ; ignore hidden ones
+    visible := WinGetList("ahk_exe Code.exe")  ; array of hwnds
+
+    if (visible.Length) {                      ; → hide them all
+        hiddenVS := []                         ; reset list
+        for hwnd in visible {
+            WinHide(hwnd)
+            WinSetTransparent(240, hwnd)
+            hiddenVS.Push(hwnd)
+        }
+        ShowDualNotifications("Code windows hidden", "Code windows hidden", 2000)
+        return
+    }
+
+    ; 2) None visible, but do we have windows stored?
+    if (hiddenVS.Length) {                     ; → restore them all
+        for hwnd in hiddenVS {
+            if WinExist(hwnd)                  ; skip closed windows
+            {
+                WinShow(hwnd)
+                WinSetTransparent(240, hwnd)
+            }
+        }
+        ; activate the last window that still exists
+        while (hiddenVS.Length) {
+            last := hiddenVS.Pop()
+            if WinExist(last) {
+                WinActivate(last)
+                break
+            }
+        }
+        ShowDualNotifications("Code windows restored", "Code windows restored", 2000)
+        return
+    }
+
+    ; 3) Nothing to restore and nothing running → launch VS Code
+    Run path
+    ShowDualNotifications("Code is launching", "Code is launching", 3000)
+    WinWaitActive("ahk_exe Code.exe", , 5)
+    Sleep 500
+    WinSetTransparent(240, "ahk_exe Code.exe")
 }
