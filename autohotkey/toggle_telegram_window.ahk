@@ -47,7 +47,7 @@ global tg_hwnd := 0  ; Store TG window handle
             2000
         )
     } else {
-        Run "D:\Programs\Telegram_portable_5.9.0\Telegram.exe"
+        Run "D:\Programs\Telegram_portable\Telegram.exe"
         ; show notification
         ShowDualNotifications(
             "TG is launching",
