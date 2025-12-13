@@ -11,7 +11,7 @@
 
  #y:: {
      Run "https://yandex.ru/images/"
-     Sleep 2000
+     Sleep 3000
      ; Paste clipboard content
      Send "^v"
      Sleep 100
