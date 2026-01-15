@@ -45,4 +45,5 @@ build/
 
 *.bat
 regedit/
+.claude/
 
