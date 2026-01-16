@@ -16,6 +16,9 @@ global hiddenqBittorrent := 0
 global hiddenVSCode := []
 global activeVSCode := 0
 global stateVSCode := []
+global hiddenWindowsTerminal := []
+global activeWindowsTerminal := 0
+global stateWindowsTerminal := []
 
 ;------------------------------------------------------------------------------
 ; Reusable toggle function for single-window apps
@@ -157,8 +160,8 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 #q:: ToggleSingleApp("Telegram", "D:\Programs\Telegram_portable\Telegram.exe", "hiddenTelegram")
 ; AIMP -> Win + S
 #s:: ToggleSingleApp("AIMP", "D:\Programs\AIMP_portable\AIMP.exe", "hiddenAIMP")
-; Yandex Music -> Win + Alt + S
-#!s:: ToggleSingleApp("YandexMusic", "C:\Users\kycok\AppData\Local\Programs\YandexMusic\YandexMusic.exe",
+; Yandex Music -> Ctrl + Win + S
+^#s:: ToggleSingleApp("YandexMusic", "C:\Users\kycok\AppData\Local\Programs\YandexMusic\YandexMusic.exe",
     "hiddenYandexMusic")
 ; Obsidian -> Win + A
 #a:: ToggleSingleApp("Obsidian", "C:\Users\kycok\AppData\local\Programs\Obsidian\Obsidian.exe", "hiddenObsidian")
@@ -167,6 +170,9 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 ; VSCode -> Win + C
 #c:: ToggleMultiApp("Code", "C:\Users\kycok\AppData\Local\Programs\Microsoft VS Code\Code.exe",
     "hiddenVSCode", "activeVSCode", "stateVSCode")
+; Windows Terminal -> Ctrl + Win + C
+^#c:: ToggleMultiApp("WindowsTerminal", "wt.exe",
+    "hiddenWindowsTerminal", "activeWindowsTerminal", "stateWindowsTerminal")
 
 ;------------------------------------------------------------------------------
 ; UI popup msg settings
