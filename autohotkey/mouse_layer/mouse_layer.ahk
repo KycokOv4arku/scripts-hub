@@ -2,7 +2,7 @@
 #SingleInstance Force
 
 ; === SPEED SETTINGS ===
-holdTimeToCheck := 0.3
+holdTimeToCheck := 0.2
 baseSpeed := 1
 accelRate := 0.2
 maxBaseSpeed := 30
@@ -20,8 +20,16 @@ ApplyCursors(true)
 ; === CAPSLOCK LOGIC ===
 ; ==============================================================================
 CapsLock:: {
+    ; If mouse mode is ON: turn OFF immediately on press
+    if (mouseLayerActive) {
+        ToggleMouseMode(false)
+        KeyWait "CapsLock"
+        return
+    }
+
+    ; If mouse mode is OFF: turn ON after hold, else toggle CapsLock
     if !KeyWait("CapsLock", "T" holdTimeToCheck) {
-        ToggleMouseMode(!mouseLayerActive)
+        ToggleMouseMode(true)
         KeyWait "CapsLock"
     } else {
         SetCapsLockState !GetKeyState("CapsLock", "T")
