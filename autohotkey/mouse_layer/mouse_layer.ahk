@@ -11,6 +11,7 @@ slowSpeed := 1
 
 ; Global State
 global mouseLayerActive := false
+
 OnExit (*) => RestoreCursors()
 
 ; Apply orange cursors on startup
@@ -165,10 +166,12 @@ ShowToast(msg, textColor := "FFFFFF", duration := 1500) {
 
 BlockOtherKeys()
 BlockOtherKeys() {
-    keysToBlock := "1234567890-=yhujiklop;zxcvbnm,./[]\'g"
+    global lastToast := 0
+    keysToBlock := "1234567890-=yhujiklopt;zxcvbnm,./[]\'g``"
     HotIf (*) => mouseLayerActive && !GetKeyState("LWin", "P") && !GetKeyState("RWin", "P") && !GetKeyState("Alt", "P")
     loop parse keysToBlock {
-        Hotkey "*" A_LoopField, (*) => {}
+        Hotkey "*" A_LoopField, (*) => (A_TickCount - lastToast > 500 ? (lastToast := A_TickCount, ShowToast(
+            "MOUSE MODE: ON", "ff00ff")) : "")
     }
     HotIf
 }
