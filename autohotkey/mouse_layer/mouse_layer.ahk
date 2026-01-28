@@ -1,6 +1,18 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 #NoTrayIcon
+
+;-----------------------------------------------------------------------
+; Toggles mouse mode on CapsLock hold (>0.2s) or CapsLock state on tap
+; WASD = cursor movement with acceleration, Shift = fast, Ctrl = slow
+; Space/E/Q = left/right/middle mouse buttons
+; R/F = scroll wheel up/down
+; Alt+A/D = browser back/forward
+; Esc = exit mouse mode
+; Changes cursor color (orange=off, pink=on) + shows toast notifications
+; Blocks most keys while in mouse mode to prevent accidental input
+;-----------------------------------------------------------------------
+
 ; === SPEED SETTINGS ===
 holdTimeToCheck := 0.2
 baseSpeed := 1
