@@ -4,6 +4,17 @@
 #NoTrayIcon
 
 ;------------------------------------------------------------------------------
+; Script: toggle_apps.ahk
+; Purpose: Hide/show single and multi-window applications with hotkeys
+; Features:
+;   - Toggle single-window apps (Telegram, AIMP, Yandex Music, Obsidian, qBittorrent)
+;   - Toggle multi-window apps (VS Code, Windows Terminal)
+;   - Preserve window states and Z-order
+;   - Show dual-screen notifications
+; Hotkeys: Win+Q, Win+S, Ctrl+Win+S, Win+A, Win+T, Win+C, Ctrl+Win+C
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
 ; Globals for single-window apps
 ;------------------------------------------------------------------------------
 global hiddenTelegram := 0
