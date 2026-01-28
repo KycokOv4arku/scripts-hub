@@ -1,3 +1,7 @@
+#Requires AutoHotkey v2.0
+#SingleInstance Force Force
+#NoTrayIcon
+
 ; ImageGlass Fullscreen Overlay - Auto-shows filename at top when in fullscreen mode
 ; Toggle auto-mode: Shift+F11 | Auto-hides when windowed or inactive
 ; Needed params setup ImageGlass/Seetings/General/Image information tags

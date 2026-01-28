@@ -1,18 +1,20 @@
- #Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
+#SingleInstance Force Force
+#NoTrayIcon
 
- ; -----------------------------------------------------------------------------
- ; Search Clipboard Image on Yandex (AutoHotkey v2.0)
- ; • Hotkey: Win+Y
- ; • Workflow:
- ;     – Copy an image to the clipboard (e.g., PrintScreen → select → Ctrl+C)
- ;     – Press Win+Y
- ;     – Opens Yandex Images and pastes the clipboard contents
- ; -----------------------------------------------------------------------------
+; -----------------------------------------------------------------------------
+; Search Clipboard Image on Yandex (AutoHotkey v2.0)
+; • Hotkey: Win+Y
+; • Workflow:
+;     – Copy an image to the clipboard (e.g., PrintScreen → select → Ctrl+C)
+;     – Press Win+Y
+;     – Opens Yandex Images and pastes the clipboard contents
+; -----------------------------------------------------------------------------
 
- #y:: {
-     Run "https://yandex.ru/images/"
-     Sleep 3000
-     ; Paste clipboard content
-     Send "^v"
-     Sleep 100
- }
+#y:: {
+    Run "https://yandex.ru/images/"
+    Sleep 3000
+    ; Paste clipboard content
+    Send "^v"
+    Sleep 100
+}

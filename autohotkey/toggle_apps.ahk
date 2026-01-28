@@ -1,6 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 #WinActivateForce
+#NoTrayIcon
+
 ;------------------------------------------------------------------------------
 ; Globals for single-window apps
 ;------------------------------------------------------------------------------

@@ -1,4 +1,6 @@
 ﻿#Requires AutoHotkey v2.0
+#SingleInstance Force Force
+#NoTrayIcon
 
 ; -----------------------------------------------------------------------------
 ; Window Transparency Manager (AutoHotkey v2.0)

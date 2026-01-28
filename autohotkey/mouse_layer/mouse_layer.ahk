@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-
+#NoTrayIcon
 ; === SPEED SETTINGS ===
 holdTimeToCheck := 0.2
 baseSpeed := 1
