@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-
+#WinActivateForce
 ;------------------------------------------------------------------------------
 ; Globals for single-window apps
 ;------------------------------------------------------------------------------
