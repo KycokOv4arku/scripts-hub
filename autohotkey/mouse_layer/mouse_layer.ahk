@@ -29,9 +29,30 @@ OnExit (*) => RestoreCursors()
 ; Apply orange cursors on startup
 ApplyCursors(true)
 
+; === BLOCK IN GAMES / APPS (active window process) ===
+blockedProcs := Map("overwatch.exe", true)
+IsBlockedAppActive() {
+    global blockedProcs
+    try {
+        p := StrLower(WinGetProcessName("A"))
+        return blockedProcs.Has(p)
+    } catch {
+        return false
+    }
+}
+
+; Auto-disable mouse mode if a blocked app becomes active
+SetTimer CheckBlockedApp, 100
+CheckBlockedApp() {
+    global mouseLayerActive
+    if (mouseLayerActive && IsBlockedAppActive())
+        ToggleMouseMode(false)
+}
+
 ; ==============================================================================
 ; === CAPSLOCK LOGIC ===
 ; ==============================================================================
+#HotIf !IsBlockedAppActive()
 CapsLock:: {
     ; If mouse mode is ON: turn OFF immediately on press
     if (mouseLayerActive) {
@@ -48,11 +69,12 @@ CapsLock:: {
         SetCapsLockState !GetKeyState("CapsLock", "T")
     }
 }
+#HotIf
 
 ; ==============================================================================
 ; === MOUSE LAYER HOTKEYS ===
 ; ==============================================================================
-#HotIf mouseLayerActive && !GetKeyState("LWin", "P") && !GetKeyState("RWin", "P")
+#HotIf mouseLayerActive && !IsBlockedAppActive() && !GetKeyState("LWin", "P") && !GetKeyState("RWin", "P")
 
 *Esc:: ToggleMouseMode(false)
 
@@ -76,7 +98,8 @@ CapsLock:: {
 ; === TOGGLE & CURSOR LOGIC ===
 ; ==============================================================================
 ToggleMouseMode(isActive) {
-    global mouseLayerActive := isActive
+    global mouseLayerActive
+    mouseLayerActive := isActive
 
     if (mouseLayerActive) {
         ApplyCursors(false)  ; Pink when ON
@@ -180,7 +203,9 @@ BlockOtherKeys()
 BlockOtherKeys() {
     global lastToast := 0
     keysToBlock := "1234567890-=yhujiklopt;zxcvbnm,./[]\'g``"
-    HotIf (*) => mouseLayerActive && !GetKeyState("LWin", "P") && !GetKeyState("RWin", "P") && !GetKeyState("Alt", "P")
+    HotIf (*) => mouseLayerActive
+        && !IsBlockedAppActive()
+        && !GetKeyState("LWin", "P") && !GetKeyState("RWin", "P") && !GetKeyState("Alt", "P")
     loop parse keysToBlock {
         Hotkey "*" A_LoopField, (*) => (A_TickCount - lastToast > 500 ? (lastToast := A_TickCount, ShowToast(
             "MOUSE MODE: ON", "ff00ff")) : "")
