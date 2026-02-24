@@ -15,9 +15,9 @@
 
 ; === SPEED SETTINGS ===
 holdTimeToCheck := 0.2
-baseSpeed := 1
-accelRate := 0.2
-maxBaseSpeed := 30
+baseSpeed := 0.1
+accelRate := 3
+maxBaseSpeed := 100
 fastSpeed := 50
 slowSpeed := 1
 
