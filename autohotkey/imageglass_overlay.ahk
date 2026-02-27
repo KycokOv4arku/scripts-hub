@@ -1,5 +1,5 @@
 #Requires AutoHotkey v2.0
-#SingleInstance Force Force
+#SingleInstance Force
 #NoTrayIcon
 
 ; ImageGlass Fullscreen Overlay - Auto-shows filename at top when in fullscreen mode
