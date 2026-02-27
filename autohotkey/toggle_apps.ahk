@@ -174,7 +174,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 ; AIMP -> Win + S
 #s:: ToggleSingleApp("AIMP", "D:\Programs\AIMP_portable\AIMP.exe", "hiddenAIMP")
 ; Yandex Music -> Ctrl + Win + S
-^#s:: ToggleSingleApp("YandexMusic", "C:\Users\kycok\AppData\Local\Programs\YandexMusic\YandexMusic.exe",
+^#s:: ToggleSingleApp("Яндекс Музыка", "C:\Users\kycok\AppData\Local\Programs\YandexMusic\Яндекс Музыка.exe",
     "hiddenYandexMusic")
 ; Obsidian -> Win + A
 #a:: ToggleSingleApp("Obsidian", "C:\Users\kycok\AppData\local\Programs\Obsidian\Obsidian.exe", "hiddenObsidian")
