@@ -10,7 +10,12 @@ JBS_NEXT_KEY := "^!i"  ; next picture
 JBS_CLEAR_KEY := "^!p"  ; clear background
 JBS_SETTINGS_KEY := "^!o"  ; show settings
 
+CHORD_TIMEOUT := 10  ; seconds; used for both WaitKey and matching popup duration
+
 g_ih := 0
+g_notifLeft := 0
+g_notifRight := 0
+g_notifTimer := 0
 
 ; Returns screen-center coords of the leftmost monitor
 LeftMonitorCenter(&cx, &cy) {
@@ -25,7 +30,20 @@ LeftMonitorCenter(&cx, &cy) {
     }
 }
 
+DismissNotification() {
+    global g_notifLeft, g_notifRight, g_notifTimer
+    if g_notifTimer
+        SetTimer(g_notifTimer, 0)
+    if g_notifLeft
+        g_notifLeft.Destroy()
+    if g_notifRight
+        g_notifRight.Destroy()
+    g_notifLeft := g_notifRight := g_notifTimer := 0
+}
+
 ShowDualNotifications(msg, duration := 1000) {
+    global g_notifLeft, g_notifRight, g_notifTimer
+    DismissNotification()
     LeftGui := Gui(, "Left"), RightGui := Gui(, "Right")
     for _, g in [LeftGui, RightGui] {
         g.Opt("+AlwaysOnTop -Caption +ToolWindow")
@@ -38,7 +56,9 @@ ShowDualNotifications(msg, duration := 1000) {
     LeftGui.GetPos(, , &gw, &gh)
     LeftGui.Move(lx - gw // 2, ly - gh // 2 - 100)
     RightGui.Show("xCenter y" (A_ScreenHeight // 2 - gh // 2 - 100) " NoActivate")
-    SetTimer(() => (LeftGui.Destroy(), RightGui.Destroy()), -duration)
+    g_notifLeft := LeftGui
+    g_notifRight := RightGui
+    SetTimer(g_notifTimer := () => DismissNotification(), -duration)
 }
 
 ; Capture one keypress (suppressed, not passed through); mouse/timeout returns ""
@@ -73,8 +93,9 @@ ViewWithMonitor(jbs_key, label) {
     }
     SetWinDelay -1
     WinActivate "Select Background"
-    ShowDualNotifications("a=left   f=right")
-    key := WaitKey()
+    ShowDualNotifications("a=left   f=right", CHORD_TIMEOUT * 1000)
+    key := WaitKey(CHORD_TIMEOUT)
+    DismissNotification()
     if key != "a" && key != "f" {
         ShowDualNotifications("JBS abort")
         return
@@ -92,8 +113,9 @@ ViewWithMonitor(jbs_key, label) {
 ;   b  settings
 #v:: {
     global JBS_PREV_KEY, JBS_CUR_KEY, JBS_NEXT_KEY, JBS_CLEAR_KEY, JBS_SETTINGS_KEY
-    ShowDualNotifications("a - view prev`ns - view cur`nd - next`nc - clear`nb - settings")
-    key := WaitKey()
+    ShowDualNotifications("a - view prev`ns - view cur`nd - next`nc - clear`nb - settings", CHORD_TIMEOUT * 1000)
+    key := WaitKey(CHORD_TIMEOUT)
+    DismissNotification()
     switch key {
         case "a": ViewWithMonitor(JBS_PREV_KEY, "prev")
         case "s": ViewWithMonitor(JBS_CUR_KEY, "cur")
