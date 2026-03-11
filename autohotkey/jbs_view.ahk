@@ -61,13 +61,15 @@ ShowDualNotifications(msg, duration := 1000) {
     SetTimer(g_notifTimer := () => DismissNotification(), -duration)
 }
 
-; Capture one keypress (suppressed, not passed through); mouse/timeout returns ""
+; Capture one keypress by physical key (layout-independent); mouse/timeout returns ""
+; Uses EndKey instead of L1 so Russian/other layouts map to Latin VK names
 WaitKey(timeout := 10) {
     global g_ih
-    g_ih := InputHook("L1 T" timeout)
+    g_ih := InputHook("T" timeout)
+    g_ih.KeyOpt("{a}{b}{c}{d}{e}{f}{g}{h}{i}{j}{k}{l}{m}{n}{o}{p}{q}{r}{s}{t}{u}{v}{w}{x}{y}{z}", "ES")
     g_ih.Start()
     g_ih.Wait()
-    key := g_ih.Input
+    key := (g_ih.EndReason = "EndKey") ? StrLower(g_ih.EndKey) : ""
     g_ih := 0
     return key
 }
