@@ -36,8 +36,8 @@ ShowDualNotifications(msg, duration := 1000) {
     LeftMonitorCenter(&lx, &ly)
     LeftGui.Show("x-99999 y-99999 NoActivate")
     LeftGui.GetPos(, , &gw, &gh)
-    LeftGui.Move(lx - gw // 2, ly - gh // 2)
-    RightGui.Show("xCenter yCenter NoActivate")
+    LeftGui.Move(lx - gw // 2, ly - gh // 2 - 100)
+    RightGui.Show("xCenter y" (A_ScreenHeight // 2 - gh // 2 - 100) " NoActivate")
     SetTimer(() => (LeftGui.Destroy(), RightGui.Destroy()), -duration)
 }
 
