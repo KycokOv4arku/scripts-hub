@@ -84,7 +84,7 @@ CancelChord() {
 ~XButton1:: CancelChord()
 ~XButton2:: CancelChord()
 
-; Opens JBS dialog, waits for a/f to pick left/right monitor
+; Opens JBS dialog, waits for a/d to pick left/right monitor
 ViewWithMonitor(jbs_key, label) {
     SendEvent jbs_key
     if !WinWait("Select Background", , 10) {
@@ -93,10 +93,10 @@ ViewWithMonitor(jbs_key, label) {
     }
     SetWinDelay -1
     WinActivate "Select Background"
-    ShowDualNotifications("a=left   f=right", CHORD_TIMEOUT * 1000)
+    ShowDualNotifications("a=left   d=right", CHORD_TIMEOUT * 1000)
     key := WaitKey(CHORD_TIMEOUT)
     DismissNotification()
-    if key != "a" && key != "f" {
+    if key != "a" && key != "d" {
         ShowDualNotifications("JBS abort")
         return
     }
@@ -106,8 +106,8 @@ ViewWithMonitor(jbs_key, label) {
 }
 
 ; Win+V → first chord → action
-;   a  view prev    (then a/f for monitor)
-;   s  view cur     (then a/f for monitor)
+;   a  view prev    (then a/d for monitor)
+;   s  view cur     (then a/d for monitor)
 ;   d  next pic
 ;   c  clear bg
 ;   b  settings
