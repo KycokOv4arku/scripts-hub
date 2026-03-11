@@ -111,6 +111,7 @@ ViewWithMonitor(jbs_key, label) {
 ;   d  next pic
 ;   c  clear bg
 ;   b  settings
+#HotIf !WinActive("ahk_exe overwatch.exe")
 #v:: {
     global JBS_PREV_KEY, JBS_CUR_KEY, JBS_NEXT_KEY, JBS_CLEAR_KEY, JBS_SETTINGS_KEY
     ShowDualNotifications("a - view prev`ns - view cur`nd - next`nc - clear`nb - settings", CHORD_TIMEOUT * 1000)
@@ -132,3 +133,6 @@ ViewWithMonitor(jbs_key, label) {
             ShowDualNotifications("JBS abort")
     }
 }
+#HotIf WinActive("ahk_exe overwatch.exe")
+#v:: ShowDualNotifications("win+v game-mode blocked")
+#HotIf
