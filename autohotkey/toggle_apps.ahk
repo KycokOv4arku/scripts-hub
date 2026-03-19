@@ -20,7 +20,9 @@
 global hiddenTelegram := 0
 global hiddenAIMP := 0
 global hiddenYandexMusic := 0
-global hiddenObsidian := 0
+global hiddenObsidian := []
+global activeObsidian := 0
+global stateObsidian := []
 global hiddenqBittorrent := 0
 
 ;------------------------------------------------------------------------------
@@ -140,6 +142,10 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 
         if (!isAnyActive) {
             ShowDualNotifications(exeName " active", exeName " active", 2000)
+            for hwnd in visible {
+                if WinGetMinMax(hwnd) = -1
+                    WinRestore hwnd
+            }
             WinActivate visible[1]
             return
         }
@@ -177,7 +183,8 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 ^#s:: ToggleSingleApp("Яндекс Музыка", "C:\Users\kycok\AppData\Local\Programs\YandexMusic\Яндекс Музыка.exe",
     "hiddenYandexMusic")
 ; Obsidian -> Win + A
-#a:: ToggleSingleApp("Obsidian", "C:\Users\kycok\AppData\local\Programs\Obsidian\Obsidian.exe", "hiddenObsidian")
+#a:: ToggleMultiApp("Obsidian", "C:\Users\kycok\AppData\local\Programs\Obsidian\Obsidian.exe",
+    "hiddenObsidian", "activeObsidian", "stateObsidian")
 ; qBittorrent -> Win + T
 #t:: ToggleSingleApp("qBittorrent", "C:\Program Files\qBittorrent\qbittorrent.exe", "hiddenqBittorrent")
 ; VSCode -> Win + C
