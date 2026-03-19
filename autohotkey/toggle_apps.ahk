@@ -46,7 +46,7 @@ ToggleSingleApp(exeName, exePath, handleName) {
 
     ; Check if hidden
     if (hiddenHandle && WinExist(hiddenHandle)) {
-        ShowDualNotifications(exeName " active", exeName " active", 2000)
+        ShowDualNotifications(exeName " active")
         WinShow hiddenHandle
         WinActivate hiddenHandle
         %handleName% := 0
@@ -54,12 +54,12 @@ ToggleSingleApp(exeName, exePath, handleName) {
     ; Check if visible
     else if WinExist("ahk_exe " exeName ".exe") {
         if WinActive("ahk_exe " exeName ".exe") {
-            ShowDualNotifications(exeName " hidden", exeName " hidden", 2000)
+            ShowDualNotifications(exeName " hidden")
             %handleName% := WinExist("A")
             WinHide %handleName%
         }
         else {
-            ShowDualNotifications(exeName " active", exeName " active", 2000)
+            ShowDualNotifications(exeName " active")
             if WinGetMinMax("ahk_exe " exeName ".exe") = -1
                 WinRestore "ahk_exe " exeName ".exe"
             WinActivate "ahk_exe " exeName ".exe"
@@ -67,7 +67,7 @@ ToggleSingleApp(exeName, exePath, handleName) {
     }
     ; Launch
     else {
-        ShowDualNotifications(exeName " launching", exeName " launching", 2000)
+        ShowDualNotifications(exeName " launching")
         Run exePath
         if WinWait("ahk_exe " exeName ".exe", , 3)
             WinActivate "ahk_exe " exeName ".exe"
@@ -86,7 +86,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 
     ; 1. Restore hidden windows
     if (hiddenHandles.Length > 0) {
-        ShowDualNotifications(exeName " active", exeName " active", 2000)
+        ShowDualNotifications(exeName " active")
 
         ; Restore in REVERSE order to preserve Z-order (bottom to top)
         ; WinGetList returns windows in Z-order (top to bottom)
@@ -141,7 +141,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
         }
 
         if (!isAnyActive) {
-            ShowDualNotifications(exeName " active", exeName " active", 2000)
+            ShowDualNotifications(exeName " active")
             for hwnd in visible {
                 if WinGetMinMax(hwnd) = -1
                     WinRestore hwnd
@@ -150,7 +150,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
             return
         }
 
-        ShowDualNotifications(exeName " hidden", exeName " hidden", 2000)
+        ShowDualNotifications(exeName " hidden")
         %activeName% := activeHwnd
         %handleName% := []
         %stateName% := []
@@ -166,7 +166,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
     }
 
     ; 3. Launch
-    ShowDualNotifications(exeName " launching", exeName " launching", 2000)
+    ShowDualNotifications(exeName " launching")
     Run '"' exePath '"'
     if WinWait("ahk_exe " exeName ".exe", , 3)
         WinActivate "ahk_exe " exeName ".exe"
@@ -197,14 +197,49 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 ;------------------------------------------------------------------------------
 ; UI popup msg settings
 ;------------------------------------------------------------------------------
-ShowDualNotifications(leftMsg, rightMsg, duration := 2000) {
+g_notifLeft := 0
+g_notifRight := 0
+g_notifTimer := 0
+
+LeftMonitorCenter(&cx, &cy) {
+    leftL := 99999
+    loop MonitorGetCount() {
+        MonitorGet(A_Index, &L, &T, &R, &B)
+        if L < leftL {
+            leftL := L
+            cx := (L + R) // 2
+            cy := (T + B) // 2
+        }
+    }
+}
+
+DismissNotification() {
+    global g_notifLeft, g_notifRight, g_notifTimer
+    if g_notifTimer
+        SetTimer(g_notifTimer, 0)
+    if g_notifLeft
+        g_notifLeft.Destroy()
+    if g_notifRight
+        g_notifRight.Destroy()
+    g_notifLeft := g_notifRight := g_notifTimer := 0
+}
+
+ShowDualNotifications(msg, duration := 1000) {
+    global g_notifLeft, g_notifRight, g_notifTimer
+    DismissNotification()
     LeftGui := Gui(, "Left"), RightGui := Gui(, "Right")
     for _, g in [LeftGui, RightGui] {
         g.Opt("+AlwaysOnTop -Caption +ToolWindow")
         g.SetFont("s18 w600", "Segoe UI")
-        g.BackColor := "161616"
-        g.Add("Text", "cdedede w200 Center", (g = LeftGui) ? leftMsg : rightMsg)
+        g.BackColor := "2c2c2c"
+        g.Add("Text", "cdedede", msg)
     }
-    LeftGui.Show("x-700 y522 NoActivate"), RightGui.Show("xCenter yCenter NoActivate")
-    SetTimer () => (LeftGui.Destroy(), RightGui.Destroy()), -duration
+    LeftMonitorCenter(&lx, &ly)
+    LeftGui.Show("x-99999 y-99999 NoActivate")
+    LeftGui.GetPos(, , &gw, &gh)
+    LeftGui.Move(lx - gw // 2, ly - gh // 2 - 100)
+    RightGui.Show("xCenter y" (A_ScreenHeight // 2 - gh // 2 - 100) " NoActivate")
+    g_notifLeft := LeftGui
+    g_notifRight := RightGui
+    SetTimer(g_notifTimer := () => DismissNotification(), -duration)
 }
