@@ -250,6 +250,9 @@ ActivateSendRestore(hwnd, cfg) {
     wasMinimized := (WinGetMinMax(hwnd) = -1)
     wasHidden := !(style & WS_VISIBLE)
 
+    ; Make window invisible during activate cycle
+    try WinSetTransparent(0, hwnd)
+
     if wasHidden {
         WinShow hwnd
         Sleep 50
@@ -267,6 +270,7 @@ ActivateSendRestore(hwnd, cfg) {
             WinMinimize hwnd
         else if wasHidden
             WinHide hwnd
+        try WinSetTransparent("Off", hwnd)
         RestoreFocus(prevHwnd)
         return false
     }
@@ -279,6 +283,7 @@ ActivateSendRestore(hwnd, cfg) {
         WinMinimize hwnd
     else if wasHidden
         WinHide hwnd
+    try WinSetTransparent("Off", hwnd)
     RestoreFocus(prevHwnd)
     return true
 }
