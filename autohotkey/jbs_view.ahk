@@ -2,7 +2,7 @@
 #SingleInstance Force
 ; Win+V two-level chord: JBS control shortcut — coauthored w/ Claude
 
-DEBUG_MODE := true
+DEBUG_MODE := false
 if DEBUG_MODE {
     try TraySetIcon("D:\YandexDisk\images\Icons\autohotkey-red.ico")
     try FileDelete(A_ScriptDir "\debug.log")
@@ -31,6 +31,8 @@ g_ih := 0
 g_notifLeft := 0
 g_notifRight := 0
 g_notifTimer := 0
+g_poll_label := ""
+g_pre_typed := false
 
 ; Returns screen-center coords of the leftmost monitor
 LeftMonitorCenter(&cx, &cy) {
@@ -101,26 +103,33 @@ CancelChord() {
 ~XButton1:: CancelChord()
 ~XButton2:: CancelChord()
 
-_OnEndMonitor(lbl, ih) {
-    global JBS_LOAD_TIMEOUT
-    if ih.EndReason = "EndKey"
-        ShowDualNotifications("queued: " lbl " → " (StrLower(ih.EndKey) = "a" ? "left" : "right"), (JBS_LOAD_TIMEOUT + 5) * 1000)
-    else
-        DismissNotification()
+_PollPreTyped() {
+    global g_ih, g_poll_label, g_pre_typed, JBS_LOAD_TIMEOUT
+    if g_pre_typed || !g_ih
+        return
+    if g_ih.EndReason = "EndKey" {
+        g_pre_typed := true
+        ShowDualNotifications("queued: " g_poll_label " → " (StrLower(g_ih.EndKey) = "a" ? "left" : "right"), (JBS_LOAD_TIMEOUT + 5) * 1000)
+    }
 }
 
 ; Opens JBS dialog, waits for a/d to pick left/right monitor.
 ; Hook starts before SendEvent so fast-typed a/d is buffered while JBS loads.
 ViewWithMonitor(jbs_key, label) {
-    global g_ih, CHORD_TIMEOUT
+    global g_ih, CHORD_TIMEOUT, JBS_LOAD_TIMEOUT, g_poll_label, g_pre_typed
     g_ih := InputHook("T" CHORD_TIMEOUT)
     g_ih.KeyOpt("{a}{d}{Escape}{Space}", "ES")
-    g_ih.OnEnd := _OnEndMonitor.Bind(label)
     g_ih.Start()
     DebugLog("ViewWithMonitor label=" label " hook_started")
     SendEvent jbs_key
     ShowDualNotifications("a=left   d=right", CHORD_TIMEOUT * 1000)
+
+    g_poll_label := label
+    g_pre_typed := false
+    SetTimer(_PollPreTyped, 100)
+
     if !WinWait("Select Background", , JBS_LOAD_TIMEOUT) {
+        SetTimer(_PollPreTyped, 0)
         try g_ih.Stop()
         g_ih := 0
         DismissNotification()
@@ -128,6 +137,7 @@ ViewWithMonitor(jbs_key, label) {
         ShowDualNotifications("JBS dialog not found")
         return
     }
+    SetTimer(_PollPreTyped, 0)
     DebugLog("ViewWithMonitor label=" label " dialog_found hook_reason=" g_ih.EndReason)
     SetWinDelay -1
     WinActivate "Select Background"
