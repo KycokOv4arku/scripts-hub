@@ -2,6 +2,7 @@
 #SingleInstance Force
 #WinActivateForce
 #Include audio.ahk
+#NoTrayIcon
 
 ;------------------------------------------------------------------------------
 ; Script: media_router.ahk
@@ -14,7 +15,7 @@
 ;   activate_only         — activate → send → restore (Electron apps)
 ;------------------------------------------------------------------------------
 
-DEBUG_MODE := true
+DEBUG_MODE := false
 if DEBUG_MODE
     try TraySetIcon("D:\YandexDisk\images\Icons\autohotkey-red.ico")
 
