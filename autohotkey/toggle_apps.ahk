@@ -7,12 +7,32 @@
 ; Script: toggle_apps.ahk
 ; Purpose: Hide/show single and multi-window applications with hotkeys
 ; Features:
-;   - Toggle single-window apps (Telegram, AIMP, Yandex Music, Obsidian, qBittorrent)
-;   - Toggle multi-window apps (VS Code, Windows Terminal)
+;   - Toggle single-window apps (AIMP, Yandex Music, qBittorrent)
+;   - Toggle multi-window apps (Telegram, Obsidian, VS Code, Windows Terminal)
 ;   - Preserve window states and Z-order
 ;   - Show dual-screen notifications
+;   - Persist hidden-window state across script reloads (INI file)
 ; Hotkeys: Win+Q, Win+S, Ctrl+Win+S, Win+A, Win+T, Win+C, Win+W
 ;------------------------------------------------------------------------------
+
+DEBUG_MODE := false
+if DEBUG_MODE {
+    try TraySetIcon("D:\YandexDisk\images\Icons\autohotkey-red.ico")
+    try FileDelete(A_ScriptDir "\debug.log")
+}
+A_IconTip := "toggle_apps — hide/show apps with hotkeys"
+
+DebugLog(msg) {
+    global DEBUG_MODE
+    if !DEBUG_MODE
+        return
+    try FileAppend(FormatTime(, "HH:mm:ss") " " msg "`n", A_ScriptDir "\debug.log")
+}
+
+;------------------------------------------------------------------------------
+; State persistence file
+;------------------------------------------------------------------------------
+global stateFile := A_ScriptDir "\toggle_apps_state.ini"
 
 ;------------------------------------------------------------------------------
 ; Globals for single-window apps
@@ -37,6 +57,97 @@ global hiddenWindowsTerminal := []
 global activeWindowsTerminal := 0
 global stateWindowsTerminal := []
 
+RecoverHiddenWindows()
+
+;------------------------------------------------------------------------------
+; State persistence helpers
+;------------------------------------------------------------------------------
+SaveAppState(appKey, hwnds, states, active) {
+    global stateFile
+    hwndsCsv := ""
+    for i, h in hwnds
+        hwndsCsv .= (i > 1 ? "," : "") Format("0x{:X}", h)
+    IniWrite(hwndsCsv, stateFile, appKey, "hwnds")
+    if (states.Length > 0) {
+        statesCsv := ""
+        for i, s in states
+            statesCsv .= (i > 1 ? "," : "") s
+        IniWrite(statesCsv, stateFile, appKey, "states")
+        IniWrite(Format("0x{:X}", active), stateFile, appKey, "active")
+    }
+    DebugLog("save app=" appKey " hwnds=" hwndsCsv " active=" Format("0x{:X}", active))
+}
+
+LoadAppState(appKey) {
+    global stateFile
+    hwndsCsv := IniRead(stateFile, appKey, "hwnds", "")
+    if (hwndsCsv = "")
+        return {hwnds: [], states: [], active: 0}
+    hwnds := []
+    for part in StrSplit(hwndsCsv, ",")
+        hwnds.Push(Integer(Trim(part)))
+    states := []
+    statesCsv := IniRead(stateFile, appKey, "states", "")
+    if (statesCsv != "") {
+        for part in StrSplit(statesCsv, ",")
+            states.Push(Integer(Trim(part)))
+    }
+    activeStr := IniRead(stateFile, appKey, "active", "0")
+    active := Integer(Trim(activeStr))
+    return {hwnds: hwnds, states: states, active: active}
+}
+
+ClearAppState(appKey) {
+    global stateFile
+    IniDelete(stateFile, appKey)
+    DebugLog("clear app=" appKey)
+}
+
+RecoverHiddenWindows() {
+    appKeys := ["hiddenAIMP", "hiddenYandexMusic", "hiddenqBittorrent",
+                "hiddenObsidian", "hiddenTelegram", "hiddenVSCode", "hiddenWindowsTerminal"]
+    for appKey in appKeys {
+        state := LoadAppState(appKey)
+        if (state.hwnds.Length = 0)
+            continue
+        hwndsCsv := ""
+        for i, h in state.hwnds
+            hwndsCsv .= (i > 1 ? "," : "") Format("0x{:X}", h)
+        DebugLog("recover start app=" appKey " hwnds=" hwndsCsv)
+        DetectHiddenWindows(true)
+        restored := 0
+        skipped := 0
+        ; Restore in reverse order (bottom to top) to preserve Z-order
+        loop state.hwnds.Length {
+            index := state.hwnds.Length - A_Index + 1
+            hwnd := state.hwnds[index]
+            if WinExist(hwnd) {
+                WinShow hwnd
+                if (state.states.Length >= index) {
+                    st := state.states[index]
+                    if (st = 1)
+                        WinMaximize hwnd
+                    else
+                        WinRestore hwnd
+                    WinSetTransparent(240, hwnd)
+                }
+                DebugLog("  hwnd=" Format("0x{:X}", hwnd) " exists=1 action=show")
+                restored++
+            } else {
+                DebugLog("  hwnd=" Format("0x{:X}", hwnd) " exists=0 action=skip-stale")
+                skipped++
+            }
+        }
+        if (state.active && WinExist(state.active)) {
+            WinActivate state.active
+            WinMoveTop state.active
+        }
+        ClearAppState(appKey)
+        DebugLog("recover done app=" appKey " restored=" restored " skipped=" skipped)
+        DetectHiddenWindows(false)
+    }
+}
+
 ;------------------------------------------------------------------------------
 ; Reusable toggle function for single-window apps
 ;------------------------------------------------------------------------------
@@ -58,6 +169,7 @@ ToggleSingleApp(exeName, exePath, handleName, winCriteria := "") {
         WinActivate hiddenHandle
         WinMoveTop hiddenHandle  ; force Z-order if WinActivate was blocked
         %handleName% := 0
+        ClearAppState(handleName)
     }
     ; Check if visible
     else if WinExist(winCriteria) {
@@ -65,6 +177,7 @@ ToggleSingleApp(exeName, exePath, handleName, winCriteria := "") {
             ShowDualNotifications(exeName " hidden")
             %handleName% := WinExist("A")
             WinHide %handleName%
+            SaveAppState(handleName, [%handleName%], [], 0)
         }
         else {
             ShowDualNotifications(exeName " active")
@@ -131,6 +244,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
             %handleName% := []
             %activeName% := 0
             %stateName% := []
+            ClearAppState(handleName)
             return
         }
     }
@@ -172,6 +286,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
             %handleName%.Push(hwnd)
             %stateName%.Push(state)  ; Store state
         }
+        SaveAppState(handleName, %handleName%, %stateName%, %activeName%)
         return
     }
 
@@ -201,7 +316,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 ; VSCode -> Win + C
 #c:: ToggleMultiApp("Code", "C:\Users\kycok\AppData\Local\Programs\Microsoft VS Code\Code.exe",
     "hiddenVSCode", "activeVSCode", "stateVSCode")
-; Windows Terminal -> Ctrl + Win + C
+; Windows Terminal -> Win + W
 #w:: ToggleMultiApp("WindowsTerminal", "wt.exe",
     "hiddenWindowsTerminal", "activeWindowsTerminal", "stateWindowsTerminal")
 
