@@ -1,7 +1,21 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-#NoTrayIcon
 ; Win+V two-level chord: JBS control shortcut — coauthored w/ Claude
+
+DEBUG_MODE := true
+if DEBUG_MODE {
+    try TraySetIcon("D:\YandexDisk\images\Icons\autohotkey-red.ico")
+    try FileDelete(A_ScriptDir "\debug.log")
+} else
+    A_IconHidden := true
+A_IconTip := "jbs_view — JBS wallpaper control chord"
+
+DebugLog(msg) {
+    global DEBUG_MODE
+    if !DEBUG_MODE
+        return
+    try FileAppend(FormatTime(, "HH:mm:ss") " " msg "`n", A_ScriptDir "\debug.log")
+}
 
 ; JBS hotkeys from Settings.xml (all use Ctrl+Alt modifier)
 JBS_PREV_KEY := "^!l"  ; view previous picture
@@ -10,7 +24,8 @@ JBS_NEXT_KEY := "^!i"  ; next picture
 JBS_CLEAR_KEY := "^!p"  ; clear background
 JBS_SETTINGS_KEY := "^!o"  ; show settings
 
-CHORD_TIMEOUT := 10  ; seconds; used for both WaitKey and matching popup duration
+CHORD_TIMEOUT := 10    ; seconds; user input wait + matching popup duration
+JBS_LOAD_TIMEOUT := 30 ; seconds; max wait for JBS dialog to appear
 
 g_ih := 0
 g_notifLeft := 0
@@ -66,7 +81,7 @@ ShowDualNotifications(msg, duration := 1000) {
 WaitKey(timeout := 10) {
     global g_ih
     g_ih := InputHook("T" timeout)
-    g_ih.KeyOpt("{a}{b}{c}{d}{e}{f}{g}{h}{i}{j}{k}{l}{m}{n}{o}{p}{q}{r}{s}{t}{u}{v}{w}{x}{y}{z}", "ES")
+    g_ih.KeyOpt("{a}{b}{c}{d}{e}{f}{g}{h}{i}{j}{k}{l}{m}{n}{o}{p}{q}{r}{s}{t}{u}{v}{w}{x}{y}{z}{Escape}{Space}", "ES")
     g_ih.Start()
     g_ih.Wait()
     key := (g_ih.EndReason = "EndKey") ? StrLower(g_ih.EndKey) : ""
@@ -78,7 +93,7 @@ WaitKey(timeout := 10) {
 CancelChord() {
     global g_ih
     if g_ih
-        g_ih.Stop()
+        try g_ih.Stop()
 }
 ~LButton:: CancelChord()
 ~RButton:: CancelChord()
@@ -86,18 +101,41 @@ CancelChord() {
 ~XButton1:: CancelChord()
 ~XButton2:: CancelChord()
 
-; Opens JBS dialog, waits for a/d to pick left/right monitor
+_OnEndMonitor(lbl, ih) {
+    global JBS_LOAD_TIMEOUT
+    if ih.EndReason = "EndKey"
+        ShowDualNotifications("queued: " lbl " → " (StrLower(ih.EndKey) = "a" ? "left" : "right"), (JBS_LOAD_TIMEOUT + 5) * 1000)
+    else
+        DismissNotification()
+}
+
+; Opens JBS dialog, waits for a/d to pick left/right monitor.
+; Hook starts before SendEvent so fast-typed a/d is buffered while JBS loads.
 ViewWithMonitor(jbs_key, label) {
+    global g_ih, CHORD_TIMEOUT
+    g_ih := InputHook("T" CHORD_TIMEOUT)
+    g_ih.KeyOpt("{a}{d}{Escape}{Space}", "ES")
+    g_ih.OnEnd := _OnEndMonitor.Bind(label)
+    g_ih.Start()
+    DebugLog("ViewWithMonitor label=" label " hook_started")
     SendEvent jbs_key
-    if !WinWait("Select Background", , 10) {
+    ShowDualNotifications("a=left   d=right", CHORD_TIMEOUT * 1000)
+    if !WinWait("Select Background", , JBS_LOAD_TIMEOUT) {
+        try g_ih.Stop()
+        g_ih := 0
+        DismissNotification()
+        DebugLog("ViewWithMonitor label=" label " dialog_not_found")
         ShowDualNotifications("JBS dialog not found")
         return
     }
+    DebugLog("ViewWithMonitor label=" label " dialog_found hook_reason=" g_ih.EndReason)
     SetWinDelay -1
     WinActivate "Select Background"
-    ShowDualNotifications("a=left   d=right", CHORD_TIMEOUT * 1000)
-    key := WaitKey(CHORD_TIMEOUT)
+    g_ih.Wait()
+    key := (g_ih.EndReason = "EndKey") ? StrLower(g_ih.EndKey) : ""
+    g_ih := 0
     DismissNotification()
+    DebugLog("ViewWithMonitor label=" label " key=" key)
     if key != "a" && key != "d" {
         ShowDualNotifications("JBS abort")
         return
@@ -116,9 +154,11 @@ ViewWithMonitor(jbs_key, label) {
 #HotIf !WinActive("ahk_exe overwatch.exe")
 #v:: {
     global JBS_PREV_KEY, JBS_CUR_KEY, JBS_NEXT_KEY, JBS_CLEAR_KEY, JBS_SETTINGS_KEY
+    DebugLog("#v chord_start")
     ShowDualNotifications("a - view prev`ns - view cur`nd - next`nc - clear`nb - settings", CHORD_TIMEOUT * 1000)
     key := WaitKey(CHORD_TIMEOUT)
     DismissNotification()
+    DebugLog("#v chord_key=" key)
     switch key {
         case "a": ViewWithMonitor(JBS_PREV_KEY, "prev")
         case "s": ViewWithMonitor(JBS_CUR_KEY, "cur")
