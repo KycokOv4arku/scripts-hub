@@ -45,6 +45,8 @@ build/
 
 *.bat
 regedit/
-.claude/
+.claude/*
+!.claude/CLAUDE.md
 
 autohotkey/transparency.ini
+TODO.md
