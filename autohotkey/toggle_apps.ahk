@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 #WinActivateForce
-#NoTrayIcon
+;#NoTrayIcon
 
 ;------------------------------------------------------------------------------
 ; Script: toggle_apps.ahk
@@ -11,13 +11,12 @@
 ;   - Toggle multi-window apps (VS Code, Windows Terminal)
 ;   - Preserve window states and Z-order
 ;   - Show dual-screen notifications
-; Hotkeys: Win+Q, Win+S, Ctrl+Win+S, Win+A, Win+T, Win+C, Ctrl+Win+C
+; Hotkeys: Win+Q, Win+S, Ctrl+Win+S, Win+A, Win+T, Win+C, Win+W
 ;------------------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Globals for single-window apps
 ;------------------------------------------------------------------------------
-global hiddenTelegram := 0
 global hiddenAIMP := 0
 global hiddenYandexMusic := 0
 global hiddenObsidian := []
@@ -28,6 +27,9 @@ global hiddenqBittorrent := 0
 ;------------------------------------------------------------------------------
 ; Globals for multi-window apps
 ;------------------------------------------------------------------------------
+global hiddenTelegram := []
+global activeTelegram := 0
+global stateTelegram := []
 global hiddenVSCode := []
 global activeVSCode := 0
 global stateVSCode := []
@@ -38,8 +40,12 @@ global stateWindowsTerminal := []
 ;------------------------------------------------------------------------------
 ; Reusable toggle function for single-window apps
 ;------------------------------------------------------------------------------
-ToggleSingleApp(exeName, exePath, handleName) {
+ToggleSingleApp(exeName, exePath, handleName, winCriteria := "") {
     global
+
+    ; Default window criteria — override for apps with background helper windows
+    if (winCriteria = "")
+        winCriteria := "ahk_exe " exeName ".exe"
 
     ; Get the actual variable by name
     hiddenHandle := %handleName%
@@ -48,29 +54,33 @@ ToggleSingleApp(exeName, exePath, handleName) {
     if (hiddenHandle && WinExist(hiddenHandle)) {
         ShowDualNotifications(exeName " active")
         WinShow hiddenHandle
+        Sleep 50  ; let window become visible before focus attempt
         WinActivate hiddenHandle
+        WinMoveTop hiddenHandle  ; force Z-order if WinActivate was blocked
         %handleName% := 0
     }
     ; Check if visible
-    else if WinExist("ahk_exe " exeName ".exe") {
-        if WinActive("ahk_exe " exeName ".exe") {
+    else if WinExist(winCriteria) {
+        if WinActive(winCriteria) {
             ShowDualNotifications(exeName " hidden")
             %handleName% := WinExist("A")
             WinHide %handleName%
         }
         else {
             ShowDualNotifications(exeName " active")
-            if WinGetMinMax("ahk_exe " exeName ".exe") = -1
-                WinRestore "ahk_exe " exeName ".exe"
-            WinActivate "ahk_exe " exeName ".exe"
+            if WinGetMinMax(winCriteria) = -1
+                WinRestore winCriteria
+            Sleep 50
+            WinActivate winCriteria
+            WinMoveTop winCriteria
         }
     }
     ; Launch
     else {
         ShowDualNotifications(exeName " launching")
         Run exePath
-        if WinWait("ahk_exe " exeName ".exe", , 3)
-            WinActivate "ahk_exe " exeName ".exe"
+        if WinWait(winCriteria, , 5)
+            WinActivate winCriteria
                 %handleName% := 0
     }
 }
@@ -176,7 +186,8 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 ; Hotkey setup
 ;------------------------------------------------------------------------------
 ; Telegram -> Win + Q
-#q:: ToggleSingleApp("Telegram", "D:\Programs\Telegram_portable\Telegram.exe", "hiddenTelegram")
+#q:: ToggleMultiApp("Telegram", "D:\Programs\Telegram_portable\Telegram.exe",
+    "hiddenTelegram", "activeTelegram", "stateTelegram")
 ; AIMP -> Win + S
 #s:: ToggleSingleApp("AIMP", "D:\Programs\AIMP_portable\AIMP.exe", "hiddenAIMP")
 ; Yandex Music -> Ctrl + Win + S
@@ -191,7 +202,7 @@ ToggleMultiApp(exeName, exePath, handleName, activeName, stateName) {
 #c:: ToggleMultiApp("Code", "C:\Users\kycok\AppData\Local\Programs\Microsoft VS Code\Code.exe",
     "hiddenVSCode", "activeVSCode", "stateVSCode")
 ; Windows Terminal -> Ctrl + Win + C
-^#c:: ToggleMultiApp("WindowsTerminal", "wt.exe",
+#w:: ToggleMultiApp("WindowsTerminal", "wt.exe",
     "hiddenWindowsTerminal", "activeWindowsTerminal", "stateWindowsTerminal")
 
 ;------------------------------------------------------------------------------
