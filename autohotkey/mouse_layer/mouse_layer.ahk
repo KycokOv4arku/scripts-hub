@@ -9,7 +9,7 @@ if DEBUG_MODE {
     A_IconHidden := true
 A_IconTip := "mouse_layer — CapsLock-hold WASD cursor layer with OSL Shift-tap"
 
-Hotkey "F5", ReloadInLayer
+Hotkey "^F5", ReloadInLayer
 
 ReloadInLayer(*) {
     if !mouseLayerActive
@@ -45,33 +45,33 @@ holdTimeToCheck := 0.2
 g_velocityProfile := "A"            ; "A" = nudge → creep → cruise, "B" = nudge → linear
 
 ; Profile A (recommended primary)
-TAP_NUDGE_PX      := 2              ; instant nudge on key-down
-TAP_THRESHOLD_MS  := 100            ; below this, no continuous movement at all
-FINE_SPEED_PX     := 2              ; px/tick during fine phase
+TAP_NUDGE_PX := 2              ; instant nudge on key-down
+TAP_THRESHOLD_MS := 100            ; below this, no continuous movement at all
+FINE_SPEED_PX := 2              ; px/tick during fine phase
 FINE_THRESHOLD_MS := 300            ; switch to cruise after this
-CRUISE_START_PX   := 8              ; px/tick at start of cruise phase
-CRUISE_MAX_PX     := 100            ; cruise ramp cap
-CRUISE_RAMP_PX    := 2              ; px added per tick during cruise
+CRUISE_START_PX := 8              ; px/tick at start of cruise phase
+CRUISE_MAX_PX := 100            ; cruise ramp cap
+CRUISE_RAMP_PX := 2              ; px added per tick during cruise
 
 ; Profile B (linear comparison)
-LINEAR_START_PX   := 2
-LINEAR_MAX_PX     := 50
-LINEAR_RAMP_MS    := 300            ; ms to reach max from start
+LINEAR_START_PX := 2
+LINEAR_MAX_PX := 50
+LINEAR_RAMP_MS := 300            ; ms to reach max from start
 
-TICK_MS           := 16
-OSL_TAP_MS        := 200            ; Shift-tap must be shorter than this
-OSL_DURATION_MS   := 1500
+TICK_MS := 16
+OSL_TAP_MS := 200            ; Shift-tap must be shorter than this
+OSL_DURATION_MS := 1500
 
 ; Global State
 global mouseLayerActive := false
 global g_shiftDownTime := 0
-global g_oslActive     := false
-global g_movingActive  := false
-global g_hudGui        := 0
-global g_hudText       := 0
-global g_lastDur       := 0
-global g_lastDist      := 0
-global g_lastMaxSpeed  := 0
+global g_oslActive := false
+global g_movingActive := false
+global g_hudGui := 0
+global g_hudText := 0
+global g_lastDur := 0
+global g_lastDist := 0
+global g_lastMaxSpeed := 0
 
 OnExit (*) => RestoreCursors()
 
@@ -126,7 +126,8 @@ CapsLock:: {
 ; ==============================================================================
 ; === MOUSE LAYER HOTKEYS ===
 ; ==============================================================================
-#HotIf mouseLayerActive && !g_oslActive && !IsBlockedAppActive() && !GetKeyState("LWin", "P") && !GetKeyState("RWin", "P")
+#HotIf mouseLayerActive && !g_oslActive && !IsBlockedAppActive() && !GetKeyState("LWin", "P") && !GetKeyState("RWin",
+    "P")
 
 *Esc:: ToggleMouseMode(false)
 
@@ -142,20 +143,20 @@ d:: MoveCursor(1, 0)
 *q::MButton
 
 ; Vertical scroll (Alt+W/S) — Send releases held Alt, sends plain wheel
-!w::Send "{WheelUp}"
-!s::Send "{WheelDown}"
+!w:: Send "{WheelUp}"
+!s:: Send "{WheelDown}"
 
 ; Horizontal scroll (Alt+A/D) → Shift+wheel (universal across apps)
-!a::Send "+{WheelUp}"
-!d::Send "+{WheelDown}"
+!a:: Send "+{WheelUp}"
+!d:: Send "+{WheelDown}"
 
 ; Zoom (Ctrl+W/S) → Ctrl+wheel (universal across apps)
-^w::Send "^{WheelUp}"
-^s::Send "^{WheelDown}"
+^w:: Send "^{WheelUp}"
+^s:: Send "^{WheelDown}"
 
 ; Browser nav (plain Z/X — Ctrl+Z, Ctrl+X still pass through)
-z::Send "{Browser_Back}"
-x::Send "{Browser_Forward}"
+z:: Send "{Browser_Back}"
+x:: Send "{Browser_Forward}"
 
 ; Velocity profile
 *1:: {
@@ -299,29 +300,29 @@ UpdateHud(elapsed, phase, speed, dist := 0, maxSpeed := 0) {
         return
     if (g_velocityProfile = "A") {
         constants := "TAP_NUDGE_PX:      " TAP_NUDGE_PX "`n"
-                   . "TAP_THRESHOLD_MS:  " TAP_THRESHOLD_MS "`n"
-                   . "FINE_SPEED_PX:     " FINE_SPEED_PX "`n"
-                   . "FINE_THRESHOLD_MS: " FINE_THRESHOLD_MS "`n"
-                   . "CRUISE_START_PX:   " CRUISE_START_PX "`n"
-                   . "CRUISE_MAX_PX:     " CRUISE_MAX_PX "`n"
-                   . "CRUISE_RAMP_PX:    " CRUISE_RAMP_PX
+            . "TAP_THRESHOLD_MS:  " TAP_THRESHOLD_MS "`n"
+            . "FINE_SPEED_PX:     " FINE_SPEED_PX "`n"
+            . "FINE_THRESHOLD_MS: " FINE_THRESHOLD_MS "`n"
+            . "CRUISE_START_PX:   " CRUISE_START_PX "`n"
+            . "CRUISE_MAX_PX:     " CRUISE_MAX_PX "`n"
+            . "CRUISE_RAMP_PX:    " CRUISE_RAMP_PX
     } else {
         constants := "TAP_NUDGE_PX:      " TAP_NUDGE_PX "`n"
-                   . "LINEAR_START_PX:   " LINEAR_START_PX "`n"
-                   . "LINEAR_MAX_PX:     " LINEAR_MAX_PX "`n"
-                   . "LINEAR_RAMP_MS:    " LINEAR_RAMP_MS
+            . "LINEAR_START_PX:   " LINEAR_START_PX "`n"
+            . "LINEAR_MAX_PX:     " LINEAR_MAX_PX "`n"
+            . "LINEAR_RAMP_MS:    " LINEAR_RAMP_MS
     }
     txt := "PROFILE: " g_velocityProfile "`n"
-         . "elapsed: " elapsed " ms`n"
-         . "phase:   " phase "`n"
-         . "speed:   " Round(speed, 1) " px/tick`n"
-         . "dist:    " Round(dist) " px`n"
-         . "----`n"
-         . "LAST PRESS`n"
-         . "  dur:    " g_lastDur " ms`n"
-         . "  dist:   " Round(g_lastDist) " px`n"
-         . "  maxSpd: " Round(g_lastMaxSpeed, 1) " px/tick`n"
-         . "----`n" constants
+        . "elapsed: " elapsed " ms`n"
+        . "phase:   " phase "`n"
+        . "speed:   " Round(speed, 1) " px/tick`n"
+        . "dist:    " Round(dist) " px`n"
+        . "----`n"
+        . "LAST PRESS`n"
+        . "  dur:    " g_lastDur " ms`n"
+        . "  dist:   " Round(g_lastDist) " px`n"
+        . "  maxSpd: " Round(g_lastMaxSpeed, 1) " px/tick`n"
+        . "----`n" constants
     g_hudText.Text := txt
 }
 
@@ -358,18 +359,18 @@ MoveCursor(dirX, dirY) {
     try {
         while (mouseLayerActive && !g_oslActive && AnyMoveKeyDown()) {
             if GetKeyState("Alt", "P") || GetKeyState("Ctrl", "P")
-             || GetKeyState("LWin", "P") || GetKeyState("RWin", "P")
+            || GetKeyState("LWin", "P") || GetKeyState("RWin", "P")
                 break
 
             x := 0, y := 0
             if GetKeyState("w", "P")
                 y := -1
             if GetKeyState("s", "P")
-                y :=  1
+                y := 1
             if GetKeyState("a", "P")
                 x := -1
             if GetKeyState("d", "P")
-                x :=  1
+                x := 1
 
             elapsed := A_TickCount - startTime
             speed := ComputeSpeed(elapsed)
