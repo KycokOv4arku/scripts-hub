@@ -27,6 +27,15 @@
     pwsh -ExecutionPolicy Bypass -File yt_vo_ru.ps1 "https://youtu.be/XXXXXXXXXXX"
 #>
 param([string]$Url)
+# extract video ID from any youtube URL or bare ID
+if ($Url -match '(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})') {
+    $Url = "https://www.youtube.com/watch?v=$($matches[1])"
+}
+elseif ($Url -match '^[a-zA-Z0-9_-]{11}$') {
+    $Url = "https://www.youtube.com/watch?v=$Url"
+}
+
+
 
 Write-Host "[debug] HTTPS_PROXY=[$env:HTTPS_PROXY]" -ForegroundColor DarkGray
 Write-Host "[debug] HTTP_PROXY=[$env:HTTP_PROXY]"  -ForegroundColor DarkGray
