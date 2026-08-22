@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Gandalf the Focus Keeper
 // @namespace    http://tampermonkey.net/
-// @version      260806
+// @version      260822
 // @description  Gandalf blocks mindless visits to distracting sites (socials, news, forums)—unless you really insist and jump through his hoops.
-// @author       👾claude sonnet 5 [mid] & 🤖gemini 3.5 flash [mid] for kckv4rk
+// @author       👾 claude opus 5 [high] for kycok_ov4arku
 // @run-at       document-start
 // @match        *://dtf.ru/*
 // @match        *://meduza.io/*
@@ -37,7 +37,23 @@ const MEME2 = 'https://i125.fastpic.org/big/2025/0515/0c/f2a693003f6f74497144d5d
 const MEME3 = 'https://i125.fastpic.org/big/2025/0515/fe/f9c4e239f1d07217375bf1d7237184fe.jpeg'; // Gandalf: "Ok, but give me a password"
 const MEME4 = 'https://i128.fastpic.org/big/2026/0803/89/f5fc509525dbb859795573fc54c44489.jpeg'; // Falling Gandalf: "Fly, you fools!"
 
-const COOLDOWN_MINUTES = 120; // Mandatory cooldown lockout time in minutes
+// Grace is picked from a small menu, not a continuous dial — a fine-grained
+// slider just invites haggling with yourself, which is the habit being blocked.
+const GRACE_MIN = 5;
+const GRACE_MAX = 30;
+const GRACE_STEP = 5;
+
+// Cooldown scales with the grace taken. A flat penalty punishes honesty: if a
+// 5-minute peek costs the same as 30, you learn to always request the maximum.
+// Ratio 4 fixes the duty cycle at 20% wherever you land on the slider.
+const COOLDOWN_RATIO = 4;
+const COOLDOWN_FLOOR_MINUTES = 15; // stops 5-minute drive-bys from being ~free
+
+// Grace only burns while you're actually looking. A wall-clock grace creates a
+// pull back to the tab ("my time is running out"), which is backwards. But an
+// indefinitely parked balance lets you dip in 30s at a time forever, so the
+// token also dies this many times its length after issue, cooldown included.
+const GRACE_SHELF_RATIO = 2;
 
 const NUM_WORDS = [
     "zero","one","two","three","four","five","six","seven","eight","nine","ten",
@@ -45,30 +61,80 @@ const NUM_WORDS = [
     "twenty-one","twenty-two","twenty-three","twenty-four","twenty-five","twenty-six","twenty-seven","twenty-eight","twenty-nine","thirty"
 ];
 
+// No content word is reused between these, so each one reads as new ground
+// rather than a variation you can half-type from muscle memory. Only function
+// words (the, of, and) repeat — unavoidable, and they aren't what you notice.
 const LOTR_SENTENCES = [
-    "The road goes ever on, yet you stand frozen at the crossroads of illusion, lured by the whispers of the digital void.",
-    "A shadow lies upon your purpose; the glowing screen binds your gaze with a subtle, unproductive power.",
-    "Many that live deserve rest, but these hours are stolen by idle thoughts, like leaves scattered before the cold wind.",
-    "Even the smallest task can change the course of your day, if but the courage is found to cast aside these fleeting comforts.",
-    "Despair not, for the mind may yet be fortified against the creeping haze of procrastination that seeks to dim your inner fire.",
-    "Stand fast, traveler of the West, and reclaim the fleeting moments of your life before they slip away into the dark."
+    "A road lies ahead of you, long unwalked, while the pale glow of some flickering window holds your feet rooted to this very spot.",
+    "Shadow gathers not in one great darkness but in small minutes, pilfered quietly, each too slight to mourn until they are all gone.",
+    "Even the least of deeds may turn a whole age, if only a hand will rise from its idle rest and begin in earnest the work that waits.",
+    "Despair suits none who yet draw breath; a mind can be armed against the creeping haze which dims every fire it once carried.",
+    "Stand firm, wanderer of western lands, and take back what little remains of daylight before dusk lays cold claim upon it forever.",
+    "A soul must choose how to spend such time as fate allots, for the hours slip grain by grain through fingers loosened without notice."
 ];
 // ------------------------------------
 
-const KEY = 'blockUntil';
+const REMAIN_KEY = 'graceRemaining';   // ms of grace still unspent
+const RESUMED_KEY = 'graceResumedAt';  // when the clock last started; 0 while held
+const SHELF_KEY = 'graceExpiresAt';    // wall-clock forfeit deadline for the balance
 const COOLDOWN_KEY = 'cooldownUntil';
+const GRACE_TAKEN_KEY = 'graceTaken';  // so the cooldown screen can show the trade
+const LEGACY_KEY = 'blockUntil';       // pre-260822 absolute deadline
 const now = Date.now();
 
 // Cross-site retrieval using GM storage APIs
-const until = Number(GM_getValue(KEY)) || 0;
 const cooldown = Number(GM_getValue(COOLDOWN_KEY)) || 0;
+const graceTaken = Number(GM_getValue(GRACE_TAKEN_KEY)) || 0;
 
-// Expose reset handler to the console
+if (GM_getValue(LEGACY_KEY)) GM_deleteValue(LEGACY_KEY);
+
+// Expose reset handler to the console (debug only)
 function resetGandalf() {
-    GM_deleteValue(KEY);
-    GM_deleteValue(COOLDOWN_KEY);
+    [REMAIN_KEY, RESUMED_KEY, SHELF_KEY, COOLDOWN_KEY, GRACE_TAKEN_KEY, LEGACY_KEY].forEach(k => GM_deleteValue(k));
     console.log("Gandalf's blocks and cooldowns have been cleared.");
     location.reload();
+}
+
+/** Unspent grace in ms, accounting for a clock that may be running right now. */
+function graceRemainingMs() {
+    const stored = Number(GM_getValue(REMAIN_KEY)) || 0;
+    const resumedAt = Number(GM_getValue(RESUMED_KEY)) || 0;
+    return resumedAt ? stored - (Date.now() - resumedAt) : stored;
+}
+
+function mediaIsPlaying() {
+    return Array.from(document.querySelectorAll('video, audio')).some(m => !m.paused && !m.ended);
+}
+
+// Audio in a background tab is still consumption, so hidden alone isn't enough.
+function graceShouldRun() {
+    return !document.hidden || mediaIsPlaying();
+}
+
+function setGraceRunning(run) {
+    const resumedAt = Number(GM_getValue(RESUMED_KEY)) || 0;
+    if (run && !resumedAt) {
+        GM_setValue(RESUMED_KEY, String(Date.now()));
+    } else if (!run && resumedAt) {
+        GM_setValue(REMAIN_KEY, String(graceRemainingMs()));
+        GM_setValue(RESUMED_KEY, '0');
+    }
+}
+
+/** Grace is over. The cooldown clock starts *now* — never at unlock time, or a
+ *  parked tab would let the penalty elapse against grace that was never spent. */
+function spendGrace() {
+    const taken = Number(GM_getValue(GRACE_TAKEN_KEY)) || GRACE_MIN;
+    GM_deleteValue(REMAIN_KEY);
+    GM_deleteValue(RESUMED_KEY);
+    GM_deleteValue(SHELF_KEY);
+    GM_setValue(COOLDOWN_KEY, String(Date.now() + cooldownFor(taken) * 60 * 1000));
+    location.reload();
+}
+
+function graceIsStale() {
+    const shelfAt = Number(GM_getValue(SHELF_KEY)) || 0;
+    return shelfAt > 0 && Date.now() >= shelfAt;
 }
 
 if (typeof unsafeWindow !== 'undefined') {
@@ -84,7 +150,7 @@ if (location.search.includes('reset')) {
 }
 
 // --- FLOATING UNBLOCK TIMER WIDGET (TRUSTED-TYPES SAFE) ---
-function injectFloatingWidget(untilTime) {
+function injectFloatingWidget() {
     if (!document.documentElement) return;
     if (document.getElementById('gandalf-timer-widget')) return;
 
@@ -147,40 +213,53 @@ function injectFloatingWidget(untilTime) {
     document.documentElement.appendChild(widget);
 
     function updateWidget() {
-        const timeLeft = untilTime - Date.now();
-        if (timeLeft <= 0) {
+        setGraceRunning(graceShouldRun());
+
+        const timeLeft = graceRemainingMs();
+        if (timeLeft <= 0 || graceIsStale()) {
             widget.remove();
-            location.reload();
+            spendGrace();
             return;
         }
 
         const totalSecs = Math.ceil(timeLeft / 1000);
-
+        let amount;
         if (totalSecs >= 60) {
             const mins = Math.ceil(totalSecs / 60);
-            const minLabel = mins === 1 ? 'minute' : 'minutes';
-            textSpan.textContent = `Gandalf's grace will last for another ${mins} ${minLabel}.`;
+            amount = `${mins} ${mins === 1 ? 'minute' : 'minutes'}`;
         } else {
-            const secLabel = totalSecs === 1 ? 'second' : 'seconds';
-            textSpan.textContent = `Gandalf's grace will last for another ${totalSecs} ${secLabel}.`;
+            amount = `${totalSecs} ${totalSecs === 1 ? 'second' : 'seconds'}`;
         }
+
+        const running = Number(GM_getValue(RESUMED_KEY)) || 0;
+        textSpan.textContent = running
+            ? `Gandalf's grace will last for another ${amount}.`
+            : `Gandalf's grace is held at ${amount} while you are away.`;
     }
 
     updateWidget();
     setInterval(updateWidget, 1000);
+    // Hidden tabs get their timers throttled to ~1/min, so don't wait for a tick
+    // to notice you left — otherwise you'd be charged for up to a minute of it.
+    document.addEventListener('visibilitychange', () => setGraceRunning(graceShouldRun()));
 }
 
-if (until > now) {
-    const initializeWidget = () => {
-        injectFloatingWidget(until);
-    };
+if (graceRemainingMs() > 0 && !graceIsStale()) {
+    setGraceRunning(graceShouldRun());
 
     if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', initializeWidget);
+        window.addEventListener('DOMContentLoaded', injectFloatingWidget);
     } else {
-        initializeWidget();
+        injectFloatingWidget();
     }
-    setTimeout(() => location.reload(), until - now + 500);
+    return;
+}
+
+// A balance that ran out or went stale while the tab was closed still owes a toll.
+// Keyed off the shelf stamp, not the remainder — a remainder of exactly 0 is
+// falsy and would hand out a free pass.
+if (Number(GM_getValue(SHELF_KEY))) {
+    spendGrace();
     return;
 }
 
@@ -188,7 +267,7 @@ if (until > now) {
 let inCooldown = (cooldown > now);
 let unlocked = false;
 let state = 0;
-let graceMinutes = 1;
+let graceMinutes = GRACE_MIN;
 let typingStartTime = null;
 let currentWordIndex = 0;
 let words = [];
@@ -339,9 +418,10 @@ function setupContainerListeners(container) {
             const slider = document.getElementById('minSlider');
             if (slider) {
                 const val = parseInt(slider.value, 10);
-                if (!Number.isInteger(val) || val < 1 || val > 30) {
+                const offGrid = (val - GRACE_MIN) % GRACE_STEP !== 0;
+                if (!Number.isInteger(val) || val < GRACE_MIN || val > GRACE_MAX || offGrid) {
                     const errSpan = document.getElementById('minErr');
-                    if (errSpan) errSpan.textContent = 'Input 1–30 only.';
+                    if (errSpan) errSpan.textContent = `${GRACE_MIN}–${GRACE_MAX}, in steps of ${GRACE_STEP}.`;
                     slider.focus();
                 } else {
                     graceMinutes = val;
@@ -358,6 +438,8 @@ function setupContainerListeners(container) {
             graceMinutes = parseInt(slider.value, 10);
             const valSpan = document.getElementById('sliderVal');
             if (valSpan) valSpan.textContent = graceMinutes;
+            const cdSpan = document.getElementById('cdPreview');
+            if (cdSpan) cdSpan.textContent = cooldownFor(graceMinutes);
         }
     });
 
@@ -422,25 +504,26 @@ function updateProgressText(currentIndex, cpm) {
     }
 }
 
+/** Cooldown length in minutes for a given grace request. */
+function cooldownFor(minutes) {
+    return Math.max(COOLDOWN_FLOOR_MINUTES, minutes * COOLDOWN_RATIO);
+}
+
+/** One extra passage per step up the slider. Targeting a character count instead
+ *  made neighbouring steps collide on the same passage count — the sentences are
+ *  lumpy, so mapping stop to count keeps the toll strictly increasing. */
+function passagesFor(minutes) {
+    const step = Math.round((minutes - GRACE_MIN) / GRACE_STEP);
+    return Math.min(LOTR_SENTENCES.length, step + 1);
+}
+
 function generateDynamicLOTRText(minutes) {
-    const minChars = 150;
-    const maxChars = 650;
-    const targetChars = minChars + ((minutes - 1) / 29) * (maxChars - minChars);
-
-    let selectedSentences = [];
-    let cumulativeLength = 0;
-
-    for (let i = 0; i < LOTR_SENTENCES.length; i++) {
-        selectedSentences.push(LOTR_SENTENCES[i]);
-        cumulativeLength += LOTR_SENTENCES[i].length + (i > 0 ? 1 : 0);
-        if (cumulativeLength >= targetChars) {
-            break;
-        }
-    }
-    return selectedSentences.join(" ");
+    return LOTR_SENTENCES.slice(0, passagesFor(minutes)).join(" ");
 }
 
 // --- COOLDOWN TICKER LOGIC ---
+let cooldownInterval = null;
+
 function renderCooldown() {
     ensureContainer();
     const container = document.getElementById('gandalf-overlay');
@@ -450,6 +533,7 @@ function renderCooldown() {
         const remaining = cooldown - Date.now();
         if (remaining <= 0) {
             GM_deleteValue(COOLDOWN_KEY);
+            GM_deleteValue(GRACE_TAKEN_KEY);
             location.reload();
             return;
         }
@@ -480,7 +564,7 @@ function renderCooldown() {
             <b id="gandalf-cooldown-timer" style="font-size: 16px; color: #111; display: inline-block; margin-top: 6px;"></b>
           </div>
           <div style="font-size: 12px; color: #888;">
-            Take this time to focus on your primary task.
+            ${graceTaken ? `You asked for ${graceTaken} min, so the toll is ${cooldownFor(graceTaken)} min. ` : ''}Take this time to focus on your primary task.
           </div>
         </div>
     `);
@@ -488,7 +572,10 @@ function renderCooldown() {
     setEmojiFavicon();
     injectBlockStyle();
     updateCooldownTimer();
-    setInterval(updateCooldownTimer, 1000);
+    // The MutationObserver re-renders whenever the host page nukes the overlay,
+    // so re-arm rather than stacking a new ticker each time.
+    if (cooldownInterval) clearInterval(cooldownInterval);
+    cooldownInterval = setInterval(updateCooldownTimer, 1000);
 }
 
 function render() {
@@ -521,8 +608,11 @@ function render() {
                 For how many minutes shall we stall? <span id="sliderVal" style="font-weight:bold;">${graceMinutes}</span>
               </div>
               <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
-                <input id="minSlider" type="range" min="1" max="30" value="${graceMinutes}">
+                <input id="minSlider" type="range" min="${GRACE_MIN}" max="${GRACE_MAX}" step="${GRACE_STEP}" value="${graceMinutes}">
                 <button id="submitMin" style="font-size:16px; padding:8px 16px; border-radius:6px;">Cast Spell</button>
+              </div>
+              <div style="font-size:13px; color:#888; margin-top:10px;">
+                The gates then seal for <b id="cdPreview">${cooldownFor(graceMinutes)}</b> minutes.
               </div>
               <span id="minErr" style="color:red;display:block;margin-top:7px;font-size:14px;"></span>
             </div>
@@ -606,12 +696,13 @@ function render() {
                         const finalCPM = calculateCPM(0);
                         const finalElapsed = Math.round((Date.now() - typingStartTime) / 1000);
 
-                        const graceEnd = Date.now() + graceMinutes * 60 * 1000;
-                        const cooldownEnd = graceEnd + COOLDOWN_MINUTES * 60 * 1000;
+                        const graceMs = graceMinutes * 60 * 1000;
 
                         try {
-                            GM_setValue(KEY, String(graceEnd));
-                            GM_setValue(COOLDOWN_KEY, String(cooldownEnd));
+                            GM_setValue(REMAIN_KEY, String(graceMs));
+                            GM_setValue(RESUMED_KEY, String(Date.now()));
+                            GM_setValue(SHELF_KEY, String(Date.now() + graceMs * GRACE_SHELF_RATIO));
+                            GM_setValue(GRACE_TAKEN_KEY, String(graceMinutes));
                         } catch (e) {
                             // Safe fallback
                         }
