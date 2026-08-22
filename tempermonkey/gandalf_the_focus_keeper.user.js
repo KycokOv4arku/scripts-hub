@@ -1,14 +1,16 @@
 // ==UserScript==
 // @name         Gandalf the Focus Keeper
 // @namespace    http://tampermonkey.net/
-// @version      260803
+// @version      260806
 // @description  Gandalf blocks mindless visits to distracting sites (socials, news, forums)—unless you really insist and jump through his hoops.
 // @author       👾claude sonnet 5 [mid] & 🤖gemini 3.5 flash [mid] for kckv4rk
 // @run-at       document-start
 // @match        *://dtf.ru/*
 // @match        *://meduza.io/*
 // @match        *://*.youtube.com/*
-// @grant        none
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
 // ==/UserScript==
 
 (function() {
@@ -35,6 +37,8 @@ const MEME2 = 'https://i125.fastpic.org/big/2025/0515/0c/f2a693003f6f74497144d5d
 const MEME3 = 'https://i125.fastpic.org/big/2025/0515/fe/f9c4e239f1d07217375bf1d7237184fe.jpeg'; // Gandalf: "Ok, but give me a password"
 const MEME4 = 'https://i128.fastpic.org/big/2026/0803/89/f5fc509525dbb859795573fc54c44489.jpeg'; // Falling Gandalf: "Fly, you fools!"
 
+const COOLDOWN_MINUTES = 120; // Mandatory cooldown lockout time in minutes
+
 const NUM_WORDS = [
     "zero","one","two","three","four","five","six","seven","eight","nine","ten",
     "eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty",
@@ -51,9 +55,33 @@ const LOTR_SENTENCES = [
 ];
 // ------------------------------------
 
-const KEY   = 'blockUntil';
-const now   = Date.now();
-const until = Number(localStorage.getItem(KEY)) || 0;
+const KEY = 'blockUntil';
+const COOLDOWN_KEY = 'cooldownUntil';
+const now = Date.now();
+
+// Cross-site retrieval using GM storage APIs
+const until = Number(GM_getValue(KEY)) || 0;
+const cooldown = Number(GM_getValue(COOLDOWN_KEY)) || 0;
+
+// Expose reset handler to the console
+function resetGandalf() {
+    GM_deleteValue(KEY);
+    GM_deleteValue(COOLDOWN_KEY);
+    console.log("Gandalf's blocks and cooldowns have been cleared.");
+    location.reload();
+}
+
+if (typeof unsafeWindow !== 'undefined') {
+    unsafeWindow.resetGandalf = resetGandalf;
+} else {
+    window.resetGandalf = resetGandalf;
+}
+
+// URL query parameter fallback reset
+if (location.search.includes('reset')) {
+    resetGandalf();
+    return;
+}
 
 // --- FLOATING UNBLOCK TIMER WIDGET (TRUSTED-TYPES SAFE) ---
 function injectFloatingWidget(untilTime) {
@@ -142,11 +170,6 @@ function injectFloatingWidget(untilTime) {
     setInterval(updateWidget, 1000);
 }
 
-// Handle Allowed state (Grace period)
-if (location.search.includes('reset')) {
-    localStorage.removeItem(KEY);
-    return;
-}
 if (until > now) {
     const initializeWidget = () => {
         injectFloatingWidget(until);
@@ -161,6 +184,8 @@ if (until > now) {
     return;
 }
 
+// Global active blocker checks
+let inCooldown = (cooldown > now);
 let unlocked = false;
 let state = 0;
 let graceMinutes = 1;
@@ -224,7 +249,7 @@ function setEmojiFavicon() {
     if (!document.head) return;
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="56">🧙‍♂️</text></svg>';
     const svg64 = btoa(unescape(encodeURIComponent(svg)));
-    const url   = `data:image/svg+xml;base64,${svg64}`;
+    const url = `data:image/svg+xml;base64,${svg64}`;
 
     const existingIcons = document.querySelectorAll('link[rel*="icon"]');
     existingIcons.forEach(icon => icon.remove());
@@ -243,7 +268,52 @@ function injectBlockStyle() {
     style.id = 'block-style';
     style.textContent = `
         html, body { overflow: hidden !important; height: 100% !important; margin: 0 !important; padding: 0 !important; }
-        #gandalf-overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background: #ffffff !important; z-index: 2147483647 !important; overflow-y: auto !important; box-sizing: border-box !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; font-size: 16px !important; color: #111111 !important; padding: 20px !important; }
+
+        #gandalf-overlay {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: #ffffff !important;
+            z-index: 2147483647 !important;
+            box-sizing: border-box !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-size: 16px !important;
+            color: #111 !important;
+            padding: 10px !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            overflow: hidden !important;
+        }
+
+        #gandalf-card {
+            max-width: 640px !important;
+            width: 100% !important;
+            background: #fff !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 20px 0 rgba(0,0,0,0.08) !important;
+            padding: 16px !important;
+            text-align: center !important;
+            border: 1.5px solid #eee !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            max-height: 90vh !important;
+            overflow-y: auto !important;
+        }
+
+        #gandalf-card img {
+            max-height: 35vh !important;
+            width: auto !important;
+            max-width: 100% !important;
+            object-fit: contain !important;
+            margin: 0 auto 12px auto !important;
+            flex-shrink: 1 !important;
+            display: block !important;
+        }
+
         #gandalf-overlay input, #gandalf-overlay button, #gandalf-overlay select, #gandalf-overlay textarea { font-size: 16px !important; border: 1.5px solid #222 !important; border-radius: 5px !important; background: #fff !important; color: #111 !important; outline: none !important; box-shadow: none !important; font-family: inherit !important; transition: background .18s, border .15s; }
         #gandalf-overlay button { background: #fff5a2 !important; color: #222 !important; border: 1.5px solid #bba800 !important; cursor: pointer; font-weight: 500; transition: background .18s, color .15s; }
         #gandalf-overlay button:hover:not(:disabled) { background: #ffe066 !important; color: #222 !important; border-color: #e3c500 !important; }
@@ -338,9 +408,9 @@ function updateTypeDisplay(currentIndex) {
     const cpm = calculateCPM(currentInputLength);
     updateProgressText(currentIndex, cpm);
 
-    // Auto-scroll logic: Keeps the highlighted word visible inside the scroll box
+    // Dynamic centered autoscroll
     if (textArea && curSpan) {
-        curSpan.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        curSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
 
@@ -352,7 +422,6 @@ function updateProgressText(currentIndex, cpm) {
     }
 }
 
-// Generates dynamic LOTR themed text matching length constraints of 150 to 650 characters
 function generateDynamicLOTRText(minutes) {
     const minChars = 150;
     const maxChars = 650;
@@ -371,27 +440,72 @@ function generateDynamicLOTRText(minutes) {
     return selectedSentences.join(" ");
 }
 
-function render() {
+// --- COOLDOWN TICKER LOGIC ---
+function renderCooldown() {
     ensureContainer();
     const container = document.getElementById('gandalf-overlay');
     if (!container) return;
 
-    const cardCSS = `
-      max-width:440px;
-      margin:60px auto 0 auto;
-      background:#fff;
-      border-radius:16px;
-      box-shadow:0 4px 24px 0 #0001;
-      padding:30px 22px 24px 22px;
-      text-align:center;
-      border:1.5px solid #eee;
-    `;
+    function updateCooldownTimer() {
+        const remaining = cooldown - Date.now();
+        if (remaining <= 0) {
+            GM_deleteValue(COOLDOWN_KEY);
+            location.reload();
+            return;
+        }
+        const totalSecs = Math.ceil(remaining / 1000);
+        const mins = Math.floor(totalSecs / 60);
+        const secs = totalSecs % 60;
+        const minLabel = mins === 1 ? 'minute' : 'minutes';
+        const secLabel = secs === 1 ? 'second' : 'seconds';
+
+        const timerSpan = document.getElementById('gandalf-cooldown-timer');
+        if (timerSpan) {
+            if (mins > 0) {
+                timerSpan.textContent = `${mins} ${minLabel} and ${secs} ${secLabel}`;
+            } else {
+                timerSpan.textContent = `${secs} ${secLabel}`;
+            }
+        }
+    }
+
+    setInnerHTML(container, `
+        <div id="gandalf-card">
+          <img src="${MEME1}" alt="">
+          <h2 style="font-size: 18px; color: #b91c1c; margin: 0 0 10px 0; font-weight: bold;">
+            You shall not bypass the Cooldown!
+          </h2>
+          <div style="font-size: 14px; color: #555; margin-bottom: 16px; line-height: 1.5;">
+            Gandalf is keeping you focused. The gates are sealed for another:<br>
+            <b id="gandalf-cooldown-timer" style="font-size: 16px; color: #111; display: inline-block; margin-top: 6px;"></b>
+          </div>
+          <div style="font-size: 12px; color: #888;">
+            Take this time to focus on your primary task.
+          </div>
+        </div>
+    `);
+
+    setEmojiFavicon();
+    injectBlockStyle();
+    updateCooldownTimer();
+    setInterval(updateCooldownTimer, 1000);
+}
+
+function render() {
+    if (inCooldown) {
+        renderCooldown();
+        return;
+    }
+
+    ensureContainer();
+    const container = document.getElementById('gandalf-overlay');
+    if (!container) return;
 
     if (state === 0) {
         setInnerHTML(container, `
-            <div id="gandalf-card" style="${cardCSS}">
-              <img src="${MEME1}" alt="" style="max-width:100%;height:auto; border-radius:10px; margin-bottom:24px;">
-              <button id="plea" style="font-size:16px; padding:10px 22px; border-radius:6px;">
+            <div id="gandalf-card">
+              <img src="${MEME1}" alt="">
+              <button id="plea" style="font-size:16px; padding:10px 22px; border-radius:6px; margin: 0 auto;">
                 I want to pass, please...
               </button>
             </div>
@@ -401,13 +515,15 @@ function render() {
 
     } else if (state === 1) {
         setInnerHTML(container, `
-            <div id="gandalf-card" style="${cardCSS}">
-              <img src="${MEME2}" alt="" style="max-width:100%;height:auto; border-radius:10px; margin-bottom:24px;">
-              <div style="font-size:16px; margin-bottom:16px;">
+            <div id="gandalf-card">
+              <img src="${MEME2}" alt="">
+              <div style="font-size:16px; margin-bottom:12px;">
                 For how many minutes shall we stall? <span id="sliderVal" style="font-weight:bold;">${graceMinutes}</span>
               </div>
-              <input id="minSlider" type="range" min="1" max="30" value="${graceMinutes}">
-              <button id="submitMin" style="font-size:16px; margin-left:12px; padding:8px 16px; border-radius:6px;">Cast Spell</button>
+              <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                <input id="minSlider" type="range" min="1" max="30" value="${graceMinutes}">
+                <button id="submitMin" style="font-size:16px; padding:8px 16px; border-radius:6px;">Cast Spell</button>
+              </div>
               <span id="minErr" style="color:red;display:block;margin-top:7px;font-size:14px;"></span>
             </div>
         `);
@@ -423,18 +539,18 @@ function render() {
         }
 
         setInnerHTML(container, `
-            <div id="gandalf-card" style="${cardCSS}">
-              <img src="${MEME3}" alt="" style="max-width:100%;height:auto; border-radius:10px; margin-bottom:15px;">
+            <div id="gandalf-card">
+              <img src="${MEME3}" alt="">
 
-              <div style="font-size:15px; margin-bottom:12px; text-align: left; color: #555; font-weight: 500;">
-                Speak "friend" or type these ruins precisely to breach the gate:
+              <div style="font-size:14px; margin-bottom:8px; text-align: left; color: #555; font-weight: 500;">
+                Speak "friend" or type these runes precisely to breach the gate:
               </div>
 
-              <div id="gandalf-text-area" style="text-align: left; margin: 12px 0; line-height: 1.6; font-size: 15px; border: 1.5px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #fafafa; max-height: 110px; overflow-y: auto; user-select: none;">
-                <span id="gandalf-text-done" style="color: #1b5e20; background: #e8f5e9;"></span><span id="gandalf-text-current" style="border-bottom: 2px solid #b91c1c; font-weight: bold; color: #000000 !important; background: transparent; padding: 0 1px;"></span><span id="gandalf-text-remaining" style="color: #64748b;"></span>
+              <div id="gandalf-text-area" style="text-align: left; margin: 10px 0; line-height: 1.6; font-size: 15px; border: 1.5px solid #e2e8f0; padding: 12px; border-radius: 8px; background: #fafafa; max-height: 100px; overflow-y: auto; user-select: none;">
+                <span id="gandalf-text-done" style="color: #1b5e20; background: #e8f5e9;"></span><span id="gandalf-text-current" style="border-bottom: 2px solid #b91c1c; color: #000000 !important; background: rgba(185, 28, 28, 0.08); font-weight: inherit !important; padding: 0 !important; margin: 0 !important;"></span><span id="gandalf-text-remaining" style="color: #64748b;"></span>
               </div>
 
-              <div id="gandalf-progress" style="text-align: right; font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 10px;">Rune 1 of ${words.length} | 0 CPM | 0s</div>
+              <div id="gandalf-progress" style="text-align: right; font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 8px;">Rune 1 of ${words.length} | 0 CPM | 0s</div>
 
               <input id="chk" type="text" style="width:100%; padding:10px; box-sizing: border-box; font-size: 16px;" placeholder="Type the active rune here…" autofocus autocomplete="off" /><br/>
             </div>
@@ -447,7 +563,7 @@ function render() {
         const inp = document.getElementById('chk');
         if (!inp) return;
 
-        inp.addEventListener('paste',       e => e.preventDefault());
+        inp.addEventListener('paste', e => e.preventDefault());
         inp.addEventListener('contextmenu', e => e.preventDefault());
 
         if (cpmInterval) {
@@ -490,8 +606,12 @@ function render() {
                         const finalCPM = calculateCPM(0);
                         const finalElapsed = Math.round((Date.now() - typingStartTime) / 1000);
 
+                        const graceEnd = Date.now() + graceMinutes * 60 * 1000;
+                        const cooldownEnd = graceEnd + COOLDOWN_MINUTES * 60 * 1000;
+
                         try {
-                            localStorage.setItem(KEY, String(Date.now() + graceMinutes * 60 * 1000));
+                            GM_setValue(KEY, String(graceEnd));
+                            GM_setValue(COOLDOWN_KEY, String(cooldownEnd));
                         } catch (e) {
                             // Safe fallback
                         }
@@ -500,12 +620,12 @@ function render() {
                         function runCountdown() {
                             if (countdownSeconds > 0) {
                                 setInnerHTML(container, `
-                                    <div id="gandalf-card" style="${cardCSS}">
-                                      <img src="${MEME4}" alt="" style="max-width:100%;height:auto; border-radius:10px; margin-bottom:15px;">
-                                      <h2 style="font-size: 20px; color: #b91c1c; margin-bottom: 12px; font-weight: bold;">
+                                    <div id="gandalf-card">
+                                      <img src="${MEME4}" alt="">
+                                      <h2 style="font-size: 20px; color: #b91c1c; margin-bottom: 8px; font-weight: bold;">
                                         Fly, you fools! (${countdownSeconds})
                                       </h2>
-                                      <div style="font-size: 14px; color: #555; margin-top: 10px;">
+                                      <div style="font-size: 14px; color: #555; margin-top: 8px;">
                                         Channeled at <b>${finalCPM} CPM</b> | Escaped in <b>${finalElapsed}s</b>
                                       </div>
                                     </div>
