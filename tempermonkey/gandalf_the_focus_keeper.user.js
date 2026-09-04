@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gandalf the Focus Keeper
 // @namespace    http://tampermonkey.net/
-// @version      260822
+// @version      260904
 // @description  Gandalf blocks mindless visits to distracting sites (socials, news, forums)—unless you really insist and jump through his hoops.
 // @author       👾 claude opus 5 [high] for kycok_ov4arku
 // @run-at       document-start
@@ -54,6 +54,10 @@ const COOLDOWN_FLOOR_MINUTES = 15; // stops 5-minute drive-bys from being ~free
 // indefinitely parked balance lets you dip in 30s at a time forever, so the
 // token also dies this many times its length after issue, cooldown included.
 const GRACE_SHELF_RATIO = 2;
+
+// The last stretch is the part worth seeing without asking for it — hovering to
+// check how long you have left is itself a small distraction.
+const URGENT_MS = 60 * 1000;
 
 const NUM_WORDS = [
     "zero","one","two","three","four","five","six","seven","eight","nine","ten",
@@ -179,7 +183,8 @@ function injectFloatingWidget() {
         border-bottom-right-radius: 4px !important;
         overflow: hidden !important;
       }
-      #gandalf-timer-widget:hover {
+      #gandalf-timer-widget:hover,
+      #gandalf-timer-widget.gandalf-urgent {
         background: #ffffff !important;
         box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
         border: 1px solid #e2e8f0 !important;
@@ -188,13 +193,17 @@ function injectFloatingWidget() {
         padding: 8px 12px 8px 8px !important;
         overflow: visible !important;
       }
+      #gandalf-timer-widget.gandalf-urgent {
+        color: #b91c1c !important;
+      }
       #gandalf-timer-text {
         display: none !important;
         margin-left: 6px !important;
         font-weight: 500 !important;
         white-space: nowrap !important;
       }
-      #gandalf-timer-widget:hover #gandalf-timer-text {
+      #gandalf-timer-widget:hover #gandalf-timer-text,
+      #gandalf-timer-widget.gandalf-urgent #gandalf-timer-text {
         display: inline !important;
       }
     `;
@@ -221,6 +230,8 @@ function injectFloatingWidget() {
             spendGrace();
             return;
         }
+
+        widget.classList.toggle('gandalf-urgent', timeLeft <= URGENT_MS);
 
         const totalSecs = Math.ceil(timeLeft / 1000);
         let amount;
